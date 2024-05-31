@@ -4,6 +4,19 @@ from openai import OpenAI
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 class nerif_verification:
+    """
+    Output verifier for nerif
+
+    Verify output of LLM-models
+    
+    Methods:
+        __init__(possible_value=["True", "False"])
+            constructor of this class, provide your own possible_value
+        verify(text)
+            verify the text is in the possible_value
+        simple_format(text)
+            format the text to the possible_value
+    """
     def __init__(self, possible_value: list[str] = ["True", "False"]):
         if possible_value == [] or possible_value is None:
             possible_value = ["True", "False"]
@@ -23,6 +36,20 @@ class nerif_verification:
 
 
 class nerif:
+    """
+    LLM-powerd if-statement
+
+    Provide your own text and the model will determine if the statement is true or false.
+
+    Methods:
+        __init__(model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY"))
+            constructor of this class, provide your own model and api_key
+        judge(text, max_retry=5)
+            judge the text is true or false
+        instance(text, max_retry=5, model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY"))
+            create an instance and judge the text is true or false
+    """
+
     def __init__(self, model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY")):
         self.client = OpenAI(
             api_key=os.environ.get("OPENAI_API_KEY"),
@@ -76,6 +103,21 @@ class nerif:
 
 
 class nerif_match:
+    """
+    LLM-powered match-statement
+
+    Provide your own text and the model will determine the best route to take.
+
+    Methods:
+        __init__(choice_dict, model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY"))
+            constructor of this class, provide your own choice_dict, model and api_key
+        id_to_key(id)
+            convert the id to key
+        match(text, max_retry=5)
+            match the text with the choice_dict
+        instance(choice_dict, text, max_retry=5, model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY"))
+            create an instance and match the text with the choice_dict
+    """
     def __init__(self, choice_dict, model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY")):
         self.choice = choice_dict
         self.model = model
