@@ -22,3 +22,23 @@ match nerif_match.instance(choice_dict, "I wanna use gala server GPU 1-4 tonight
         func2()
     case "func3":
         func3()
+
+from openai import OpenAI
+import os
+file_content = open(__file__).read()
+client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY"),
+)
+
+condition = "What's this program doing?\n" + "```python\n" + file_content + "```"
+
+response = client.chat.completions.create(
+    messages=[
+        {
+            "role": "user",
+            "content": condition,
+        }
+    ],
+    model="gpt-3.5-turbo",
+)
+print(response.choices[0].message.content)

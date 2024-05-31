@@ -5,7 +5,6 @@ if nerif.instance("Is the sky green?"):
 else:
     print("this is false")
 
-
 if nerif.instance("China is a country"):
     print("this is true")
 else:
