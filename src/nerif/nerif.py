@@ -3,6 +3,7 @@ from openai import OpenAI
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
+
 class nerif_verification:
     def __init__(self, possible_value: list[str] = ["True", "False"]):
         if possible_value == [] or possible_value is None:
@@ -53,17 +54,11 @@ class nerif:
             result = response.choices[0].message.content
             print(result)
             if self.verification.verify(result):
-                if result == "True":
-                    return True
-                else:
-                    return False
+                return result == "True"
             else:
                 format_value = self.verification.simple_format(result)
                 if format_value is not None:
-                    if format_value == "True":
-                        return True
-                    else:
-                        return False
+                    return format_value == "True"
             try_id += 1
         raise Exception("Failed to verify the result in if.")
     
@@ -86,18 +81,20 @@ class nerif_match:
             "Given the following text, determine the best route to take.\n"
             "Choose the best route from the following options:\n"
         )
-        index = 0
-        for _, value in self.choice.items():
-            index += 1
-            self.route += f"{index}: {value}\n"
-        self.route += "<question>\n" "REPLACE_ME" "</question>\n" "Only answer with the number."
-        self.verification = nerif_verification(possible_value=[str(x) for x in range(1, index + 1)])
+    
+        for index, value in enumerate(self.choice.values()):
+            self.route += f"{index + 1}: {value}\n"
+
+        self.route += "<question>\n" "%s\n" "</question>\n" "Only answer with the number."
+        self.verification = nerif_verification(possible_value=[str(x) for x in range(1, len(self.choice) + 1)])
 
     def id_to_key(self, id):
         return list(self.choice.keys())[id - 1]
     
     def match(self, text, max_retry=5):
-        true_prompt = self.route.replace("REPLACE_ME", text)
+        
+        true_prompt = self.route % text
+
         try_id = 0
         while try_id < max_retry:
             response = self.client.chat.completions.create(
@@ -125,3 +122,60 @@ class nerif_match:
     def instance(cls, dict, text, max_retry=5, model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY")):
         isinstance = cls(dict, model=model, api_key=api_key)
         return isinstance.match(text, max_retry=max_retry)
+
+
+
+class nerif_func:
+    def __init__(self, func_dict, model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY")):
+
+        self.choice = func_dict
+        self.model = model
+        self.client = OpenAI(
+            api_key=os.environ.get("OPENAI_API_KEY"),
+        ) 
+        self.route = (
+            "Given the following text, determine the best route to take.\n"
+            "Choose the best route from the following options:\n"
+        )
+    
+        # I set the index starting from 0, hopefully that wont cause any issue
+        for index, value in enumerate(self.choice.values()):
+            self.route += f"{index}: {value}\n"
+
+        self.route += "<question>\n" "%s\n" "</question>\n" "Only answer with the number."
+        self.verification = nerif_verification(possible_value=[str(x) for x in range(len(self.choice))])
+
+    def id_to_key(self, id):
+        return list(self.choice.keys())[id]
+    
+    def match(self, text, max_retry=5):
+        
+        true_prompt = self.route % text
+
+        try_id = 0
+        while try_id < max_retry:
+            response = self.client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": true_prompt,
+                    }
+                ],
+                model=self.model,
+            )
+            choice = response.choices[0].message.content
+            if self.verification.verify(choice):
+                # pass verification
+                return self.id_to_key(int(choice))
+            else:
+                format_value = self.verification.simple_format(choice)
+                if format_value is not None:
+                    return self.id_to_key(int(format_value))
+            
+            try_id += 1
+        raise Exception("Failed to verify the result in switch.")
+    
+    @classmethod
+    def instance(cls, dict, text, max_retry=5, model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY")):
+        isinstance = cls(dict, model=model, api_key=api_key)
+        return isinstance.match(text, max_retry=max_retry)()
