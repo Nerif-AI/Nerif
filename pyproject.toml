@@ -18,9 +18,6 @@ keywords = ["feed", "reader", "tutorial"]
 dependencies = [
     "httpx",
     "openai",
-    "langchain",
-    "langchain-openai",
-    "langchain-community",
     "python-dotenv"
 ]
 requires-python = ">=3.8"
