@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nerif"
-version = "0.2.0"
+version = "0.2.1"
 description = "LLM powered Python"
 readme = "README.md"
 authors = [{ name = "Chivier Humber"}]
