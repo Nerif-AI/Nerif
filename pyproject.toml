@@ -1,10 +1,10 @@
 [build-system]
-requires      = ["setuptools>=61.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "nerif"
-version = "0.0.1"
+version = "0.2.0"
 description = "LLM powered Python"
 readme = "README.md"
 authors = [{ name = "Chivier Humber"}]
@@ -16,9 +16,19 @@ classifiers = [
 ]
 keywords = ["feed", "reader", "tutorial"]
 dependencies = [
-    "openai"
+    "httpx",
+    "openai",
+    "langchain",
+    "langchain-openai",
+    "langchain-community",
+    "python-dotenv"
 ]
-requires-python = ">=3.6"
+requires-python = ">=3.8"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
 
 [project.optional-dependencies]
 dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]

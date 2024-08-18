@@ -1,5 +1,5 @@
 import unittest
-from nerif.nerif_agent import SimpleChatAgent
+from nerif.nerif_agent.nerif_agent import SimpleChatAgent
 
 
 class MyTestCase(unittest.TestCase):

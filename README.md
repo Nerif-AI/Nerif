@@ -5,7 +5,7 @@ LLM-powered Python
 ## How to install
 
 ```
-pip install Nerif
+pip install nerif
 ```
 
 

@@ -58,7 +58,7 @@ class SimpleChatAgent:
     def chat(self, message, append=False, max_tokens=300):
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
-        print(self.messages)
+        # print(self.messages)
         if self.proxy_url is None or self.proxy_url == "":
             client = OpenAI(api_key=self.api_key)
             response = client.chat.completions.create(
@@ -129,7 +129,7 @@ class SimpleEmbeddingAgent:
         else:
             payload = json.dumps({
                 "model": self.model,
-                "inputs": string
+                "input": string
             })
             headers = {
                 'Accept': 'application/json',
@@ -143,6 +143,6 @@ class SimpleEmbeddingAgent:
             else:
                 response_text = response.text
                 result_json = json.loads(response_text)
-                result = result_json["choices"][0]["message"]["content"]
+                result = result_json["data"][0]["embedding"]
 
         return result

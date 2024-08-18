@@ -1,8 +1,9 @@
 import os
+
 import numpy as np
 from openai import OpenAI
 
-from nerif_agent import SimpleEmbeddingAgent, SimpleChatAgent
+from nerif.nerif_agent.nerif_agent import SimpleEmbeddingAgent, SimpleChatAgent
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
@@ -31,6 +32,13 @@ class NerifVeification:
             return True
         return False
 
+    def simple_fit(self, text: str):
+        text = text.lower()
+        for item in self.possible:
+            if item in text:
+                return item
+        return None
+
     def force_fit(self, text: str, similarity="cosine"):
         text_embed = self.embedding.encode(text)
         min_dist = similarity_dist(text_embed, self.possible_embed[0], similarity)
@@ -53,11 +61,13 @@ class Nerif:
             "Given the following text, determine if the statement is true or false.\n"
             "Only answer with 'True' or 'False'."
         )
+        self.temperature = temperature
         self.agent = SimpleChatAgent(proxy_url=proxy_url, api_key=api_key, model=model, temperature=temperature,
                                      default_prompt=self.prompt)
         self.verification = NerifVeification()
 
     def judge(self, text, max_retry=5):
+        self.agent.temperature = self.temperature
         user_prompt = (f"Now the question is:"
                        f"<question>\n "
                        f"{text}"
@@ -73,8 +83,14 @@ class Nerif:
                     return True
                 else:
                     return False
+            simple_fit = self.verification.simple_fit(result)
+            if simple_fit is not None:
+                if simple_fit == "True":
+                    return True
+                else:
+                    return False
             try_id += 1
-            self.agent.temperature = max(1, self.agent.temperature + 0.1)
+            self.agent.temperature = max(1.0, self.agent.temperature + 0.1)
         result = self.verification.force_fit(result)
 
         if result == "True":
@@ -88,7 +104,7 @@ class Nerif:
         return new_instance.judge(text, max_retry=max_retry)
 
 
-def nerif(text, proxy_url=None, api_key=None, model="text-embedding-3-small"):
+def nerif(text, proxy_url=None, api_key=None, model="gpt-4o"):
     return Nerif.instance(text, proxy_url=proxy_url, api_key=api_key, model=model)
 
 
@@ -113,39 +129,41 @@ class NerifMatch:
                             f"</option>\n")
         self.prompt += "</options>"
         self.prompt += "Choose the best route from the following options.\n" "Only give me the choice ID, only a number"
+        self.temperature = temperature
         self.agent = SimpleChatAgent(proxy_url=proxy_url, api_key=api_key, model=model, temperature=temperature,
                                      default_prompt=self.prompt)
         self.verification = NerifVeification(possible_value=[str(x) for x in range(1, index + 1)])
+        self.complex_verification = NerifVeification(possible_value=[value for value in self.choice.values()])
 
     def id_to_key(self, index):
         return list(self.choice.keys())[index - 1]
 
     def match(self, text, max_retry=5):
-        true_prompt = self.route.replace("REPLACE_ME", text)
+        self.agent.temperature = self.temperature
+        user_prompt = "<question>\n" f"{text}" "</question>\n" "Choose the best route from the following options.\n" \
+                      "Only give me the choice ID, only a number"
         try_id = 0
+        choice = ""
         while try_id < max_retry:
-            response = self.client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": true_prompt,
-                    }
-                ],
-                model=self.model,
-            )
-            choice = response.choices[0].message.content
+            choice = self.agent.chat(user_prompt, max_tokens=50)
             if self.verification.verify(choice):
                 # pass verification
                 return self.id_to_key(int(choice))
-            else:
-                format_value = self.verification.simple_format(choice)
-                if format_value is not None:
-                    return self.id_to_key(int(format_value))
-
+            self.agent.temperature += 0.1
             try_id += 1
+        final_prompt = "<question>\n" f"{text}" "</question>\n" "Choose the best route from the following options.\n" \
+                       "Tell me your analysis. Besides ID, I also need your analysis."
+        choice = self.agent.chat(final_prompt, max_tokens=300)
+        choice = self.complex_verification.force_fit(choice)
+        if choice is not None:
+            return self.id_to_key(int(choice))
         raise Exception("Failed to verify the result in switch.")
 
     @classmethod
-    def instance(cls, dict, text, max_retry=5, model="gpt-4o", api_key=os.environ.get("OPENAI_API_KEY")):
-        isinstance = cls(dict, model=model, api_key=api_key)
-        return isinstance.match(text, max_retry=max_retry)
+    def instance(cls, selections, text, max_retry=5, model="gpt-4o", proxy_url=None, api_key=None):
+        new_instance = cls(selections, model=model, api_key=api_key, proxy_url=proxy_url)
+        return new_instance.match(text, max_retry=max_retry)
+
+
+def nerif_match(text, selections, proxy_url=None, api_key=None, model="gpt-4o"):
+    return NerifMatch.instance(selections, text, proxy_url=proxy_url, api_key=api_key, model=model)
