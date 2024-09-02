@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nerif"
-version = "0.2.1"
+version = "0.3.0"
 description = "LLM powered Python"
 readme = "README.md"
 authors = [{ name = "Chivier Humber"}]
@@ -16,6 +16,8 @@ classifiers = [
 ]
 keywords = ["feed", "reader", "tutorial"]
 dependencies = [
+    "requests",
+    "numpy",
     "httpx",
     "openai",
     "python-dotenv"
@@ -27,10 +29,26 @@ addopts = [
     "--import-mode=importlib",
 ]
 
+
 [project.optional-dependencies]
-dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]
+dev = ["black", "bumpver", "isort", "pip-tools", "pytest", "ipython"]
 
 [project.urls]
 Homepage = "https://github.com/Chivier/nerif"
 
+
+[tool.bumpver]
+current_version = "0.3.0"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message  = "Bump version {old_version} -> {new_version}"
+commit          = true
+tag             = true
+push            = false
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
+"README.md" = [
+    "{version}",
+    "{pep440_version}",
+]
 
