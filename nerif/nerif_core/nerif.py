@@ -6,6 +6,7 @@ from openai import OpenAI
 from nerif.nerif_agent.nerif_agent import SimpleEmbeddingAgent, SimpleChatAgent
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
 
 
 def similarity_dist(vec1, vec2, func="cosine"):
@@ -16,13 +17,13 @@ def similarity_dist(vec1, vec2, func="cosine"):
 
 
 class NerifVeification:
-    def __init__(self, possible_value: list[str] = None, proxy_url=None, api_key=None, model="text-embedding-3-small"):
+    def __init__(self, possible_value: list[str] = None, model="text-embedding-3-small"):
         if possible_value is None:
             possible_value = ["True", "False"]
         if possible_value == [] or possible_value is None:
             possible_value = ["True", "False"]
         self.possible = [x.lower() for x in possible_value]
-        self.embedding = SimpleEmbeddingAgent(proxy_url, api_key, model)
+        self.embedding = SimpleEmbeddingAgent(model)
         self.possible_embed = []
         for index in range(len(self.possible)):
             self.possible_embed.append(self.embedding.encode(self.possible[index]))
@@ -52,17 +53,14 @@ class NerifVeification:
 
 
 class Nerif:
-    def __init__(self, model="gpt-4o", proxy_url=None, api_key=None, temperature=0):
-        self.client = OpenAI(
-            api_key=os.environ.get("OPENAI_API_KEY"),
-        )
+    def __init__(self, model="gpt-4o", temperature=0):
         self.model = model
         self.prompt = (
             "Given the following text, determine if the statement is true or false.\n"
             "Only answer with 'True' or 'False'."
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(proxy_url=proxy_url, api_key=api_key, model=model, temperature=temperature,
+        self.agent = SimpleChatAgent(model=model, temperature=temperature,
                                      default_prompt=self.prompt)
         self.verification = NerifVeification()
 
@@ -99,22 +97,19 @@ class Nerif:
             return False
 
     @classmethod
-    def instance(cls, text, max_retry=5, model="gpt-4o", api_key=None, proxy_url=None):
-        new_instance = cls(model=model, api_key=api_key, proxy_url=proxy_url)
+    def instance(cls, text, max_retry=5, model="gpt-4o"):
+        new_instance = cls(model=model)
         return new_instance.judge(text, max_retry=max_retry)
 
 
-def nerif(text, proxy_url=None, api_key=None, model="gpt-4o"):
-    return Nerif.instance(text, proxy_url=proxy_url, api_key=api_key, model=model)
+def nerif(text, model="gpt-4o"):
+    return Nerif.instance(text, model=model)
 
 
 class NerifMatch:
-    def __init__(self, choice_dict, model="gpt-4o", api_key=None, proxy_url=None, temperature=0):
+    def __init__(self, choice_dict, model="gpt-4o", temperature=0):
         self.choice = choice_dict
         self.model = model
-        self.client = OpenAI(
-            api_key=os.environ.get("OPENAI_API_KEY"),
-        )
         self.prompt = (
             "Given the following text, determine the best route to take.\n"
             "If it is hard to make the decision, choose the one you think is the most proper.\n"
@@ -130,7 +125,7 @@ class NerifMatch:
         self.prompt += "</options>"
         self.prompt += "Choose the best route from the following options.\n" "Only give me the choice ID, only a number"
         self.temperature = temperature
-        self.agent = SimpleChatAgent(proxy_url=proxy_url, api_key=api_key, model=model, temperature=temperature,
+        self.agent = SimpleChatAgent(model=model, temperature=temperature,
                                      default_prompt=self.prompt)
         self.verification = NerifVeification(possible_value=[str(x) for x in range(1, index + 1)])
         self.complex_verification = NerifVeification(possible_value=[value for value in self.choice.values()])
@@ -160,10 +155,10 @@ class NerifMatch:
         raise Exception("Failed to verify the result in switch.")
 
     @classmethod
-    def instance(cls, selections, text, max_retry=5, model="gpt-4o", proxy_url=None, api_key=None):
-        new_instance = cls(selections, model=model, api_key=api_key, proxy_url=proxy_url)
+    def instance(cls, selections, text, max_retry=5, model="gpt-4o"):
+        new_instance = cls(selections, model=model)
         return new_instance.match(text, max_retry=max_retry)
 
 
-def nerif_match(text, selections, proxy_url=None, api_key=None, model="gpt-4o"):
-    return NerifMatch.instance(selections, text, proxy_url=proxy_url, api_key=api_key, model=model)
+def nerif_match(text, selections, model="gpt-4o"):
+    return NerifMatch.instance(selections, text, model=model)
