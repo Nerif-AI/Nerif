@@ -20,7 +20,8 @@ dependencies = [
     "numpy",
     "httpx",
     "openai",
-    "python-dotenv"
+    "python-dotenv",
+    "litellm"
 ]
 requires-python = ">=3.8"
 
