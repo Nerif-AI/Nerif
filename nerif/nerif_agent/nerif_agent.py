@@ -245,6 +245,7 @@ class SimpleChatAgent:
 
 
 class SimpleEmbeddingAgent:
+    # TODO: support ollama embedding model
     def __init__(self, proxy_url=None, api_key=None, model="text-embedding-3-small"):
         if proxy_url is None or proxy_url == "":
             proxy_url = os.environ.get("OPENAI_PROXY_URL")
