@@ -2,8 +2,9 @@ import os
 
 import numpy as np
 from openai import OpenAI
+from typing import List, Any, Union, Dict, Optional
 
-from nerif.nerif_agent.nerif_agent import SimpleEmbeddingAgent, SimpleChatAgent
+from nerif.nerif_agent.nerif_agent import SimpleEmbeddingAgent, SimpleChatAgent, LogitsAgent
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
@@ -17,16 +18,56 @@ def similarity_dist(vec1, vec2, func="cosine"):
 
 
 class NerifVeification:
-    def __init__(self, possible_value: list[str] = None, model="text-embedding-3-small"):
-        if possible_value is None:
-            possible_value = ["True", "False"]
+    """
+    This class is used to verify the result of the Nerif.
+    If the result is in the possible_value, return the item.
+    If the result is not in the possible_value, return None.
+
+    Attributes:
+        possible: list[str] = None, model="text-embedding-3-small"
+        model: str = "text-embedding-3-small"
+        embedding_model: str = "text-embedding-3-small"
+
+    Methods:
+        verify(text: str) -> bool:
+            Verify if the text is in the possible_value.
+        simple_fit(text: str) -> str:
+            Find the best fit in the possible_value.
+        force_fit(text: str, similarity="cosine") -> str:
+            Find the best fit in the possible_value.
+    """
+
+    def __init__(
+        self,
+        possible_value: List[str] = None,
+        model: str = "text-embedding-3-small",
+        value_instruction: List[str] = None,
+    ):
         if possible_value == [] or possible_value is None:
             possible_value = ["True", "False"]
-        self.possible = [x.lower() for x in possible_value]
+        self.original_options = possible_value
+        # Convert the possible value to lower case
+        self.possible = []
+        # (Optional) Additional instructions for each possible value
+        self.possible_instruction = []
+        # If possible_instruction is not None, record the instruction for each possible value
+        for index in range(len(possible_value)):
+            self.possible.append(value_instruction[index].lower())
+            if value_instruction is not None:
+                self.possible_instruction.append(value_instruction[index])
+            else:
+                self.possible_instruction.append("")
         self.embedding = SimpleEmbeddingAgent(model)
         self.possible_embed = []
+        self.instruction_embed = []
+        # Embed the possible value and the possible instruction
         for index in range(len(self.possible)):
             self.possible_embed.append(self.embedding.encode(self.possible[index]))
+        if self.possible_instruction is not None:
+            for index in range(len(self.possible_instruction)):
+                self.instruction_embed.append(
+                    self.embedding.encode(self.possible_instruction[index])
+                )
 
     def verify(self, text: str):
         if text.lower() in self.possible:
@@ -34,10 +75,13 @@ class NerifVeification:
         return False
 
     def simple_fit(self, text: str):
+        """
+        If there is a possible value in the text, return the original option.
+        """
         text = text.lower()
-        for item in self.possible:
-            if item in text:
-                return item
+        for index in range(len(self.possible)):
+            if self.possible[index].lower() in text:
+                return self.original_options[index]
         return None
 
     def force_fit(self, text: str, similarity="cosine"):
@@ -49,7 +93,18 @@ class NerifVeification:
             if dist < min_dist:
                 min_dist = dist
                 min_id = index
-        return self.possible[min_id]
+        return self.original_options[min_id]
+    
+    def instruction_fit(self, text: str, similarity="cosine"):
+        text_embed = self.embedding.encode(text)
+        min_dist = similarity_dist(text_embed, self.instruction_embed[0], similarity)
+        min_id = 0
+        for index in range(1, len(self.instruction_embed)):
+            dist = similarity_dist(text_embed, self.instruction_embed[index], similarity)
+            if dist < min_dist:
+                min_dist = dist
+                min_id = index
+        return self.original_options[min_id]
 
 
 class Nerif:
@@ -57,20 +112,62 @@ class Nerif:
         self.model = model
         self.prompt = (
             "Given the following text, determine if the statement is true or false.\n"
+            "<question>\n"
             "Only answer with 'True' or 'False'."
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(model=model, temperature=temperature,
-                                     default_prompt=self.prompt)
+        self.agent = SimpleChatAgent(
+            model=model, temperature=temperature
+        )
+        self.logits_agent = LogitsAgent(
+            model=model, temperature=temperature
+        )
         self.verification = NerifVeification()
 
-    def judge(self, text, max_retry=5):
+    def logits_mode(self, text: str):
         self.agent.temperature = self.temperature
-        user_prompt = (f"Now the question is:"
-                       f"<question>\n "
-                       f"{text}"
-                       f"</question>\n"
-                       f"True or False? (Remeber, only) answer with 'True' or 'False'.")
+        # replace <question> with the text
+        question = "<question>\n" + text + "</question>\n"
+        user_prompt = self.prompt.replace("<question>", question)
+        response = self.logits_agent.chat(user_prompt, max_tokens=1)
+        # Fetch the logprobs of the logits
+        logprobs = response.logprobs
+        sorted_logprobs = sorted(logprobs.logprobs, key=lambda x: x.logprob, reverse=True)
+        # Try to find the most likely logprob
+        for index in range(len(sorted_logprobs)):
+            simple_fit = self.verification.simple_fit(sorted_logprobs[index].token)
+            if simple_fit is not None:
+                if simple_fit == "True":
+                    return True
+                else:
+                    return False
+        return None
+    
+    def embedding_mode(self, text: str):
+        self.agent.temperature = self.temperature
+        # replace <question> with the text
+        question = "<question>\n" + text + "</question>\n"
+        user_prompt = self.prompt.replace("<question>", question)
+        response = self.agent.chat(user_prompt, max_tokens=10)
+        if self.verification.verify(response):
+            if response == "True":
+                return True
+            else:
+                return False
+        simple_fit = self.verification.simple_fit(response)
+        if simple_fit is not None:
+            if simple_fit == "True":
+                return True
+    
+    def judge(self, text, max_retry=3):
+        self.agent.temperature = self.temperature
+        user_prompt = (
+            f"Now the question is:"
+            f"<question>\n "
+            f"{text}"
+            f"</question>\n"
+            f"True or False? Remeber, only answer with 'True' or 'False'."
+        )
         try_id = 0
         result = ""
 
@@ -118,25 +215,40 @@ class NerifMatch:
         index = 0
         for _, value in self.choice.items():
             index += 1
-            self.prompt += (f"<option>"
-                            f"<id>{index}</id>"
-                            f"<description>{value}</description>"
-                            f"</option>\n")
+            self.prompt += (
+                f"<option>"
+                f"<id>{index}</id>"
+                f"<description>{value}</description>"
+                f"</option>\n"
+            )
         self.prompt += "</options>"
-        self.prompt += "Choose the best route from the following options.\n" "Only give me the choice ID, only a number"
+        self.prompt += (
+            "Choose the best route from the following options.\n"
+            "Only give me the choice ID, only a number"
+        )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(model=model, temperature=temperature,
-                                     default_prompt=self.prompt)
-        self.verification = NerifVeification(possible_value=[str(x) for x in range(1, index + 1)])
-        self.complex_verification = NerifVeification(possible_value=[value for value in self.choice.values()])
+        self.agent = SimpleChatAgent(
+            model=model, temperature=temperature, default_prompt=self.prompt
+        )
+        self.verification = NerifVeification(
+            possible_value=[str(x) for x in range(1, index + 1)]
+        )
+        self.complex_verification = NerifVeification(
+            possible_value=[value for value in self.choice.values()]
+        )
 
     def id_to_key(self, index):
         return list(self.choice.keys())[index - 1]
 
     def match(self, text, max_retry=5):
         self.agent.temperature = self.temperature
-        user_prompt = "<question>\n" f"{text}" "</question>\n" "Choose the best route from the following options.\n" \
-                      "Only give me the choice ID, only a number"
+        user_prompt = (
+            "<question>\n"
+            f"{text}"
+            "</question>\n"
+            "Choose the best route from the following options.\n"
+            "Only give me the choice ID, only a number"
+        )
         try_id = 0
         choice = ""
         while try_id < max_retry:
@@ -146,8 +258,13 @@ class NerifMatch:
                 return self.id_to_key(int(choice))
             self.agent.temperature += 0.1
             try_id += 1
-        final_prompt = "<question>\n" f"{text}" "</question>\n" "Choose the best route from the following options.\n" \
-                       "Tell me your analysis. Besides ID, I also need your analysis."
+        final_prompt = (
+            "<question>\n"
+            f"{text}"
+            "</question>\n"
+            "Choose the best route from the following options.\n"
+            "Tell me your analysis. Besides ID, I also need your analysis."
+        )
         choice = self.agent.chat(final_prompt, max_tokens=300)
         choice = self.complex_verification.force_fit(choice)
         if choice is not None:
