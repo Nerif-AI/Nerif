@@ -52,12 +52,12 @@ class NerifVeification:
         self.possible_instruction = []
         # If possible_instruction is not None, record the instruction for each possible value
         for index in range(len(possible_value)):
-            self.possible.append(value_instruction[index].lower())
+            self.possible.append(possible_value[index].lower())
             if value_instruction is not None:
                 self.possible_instruction.append(value_instruction[index])
             else:
                 self.possible_instruction.append("")
-        self.embedding = SimpleEmbeddingAgent(model)
+        self.embedding = SimpleEmbeddingAgent(model=model)
         self.possible_embed = []
         self.instruction_embed = []
         # Embed the possible value and the possible instruction
@@ -158,6 +158,13 @@ class Nerif:
         if simple_fit is not None:
             if simple_fit == "True":
                 return True
+            else:
+                return False
+        force_fit = self.verification.force_fit(response)
+        if force_fit == "True":
+            return True
+        else:
+            return False
     
     def judge(self, text, max_retry=3):
         self.agent.temperature = self.temperature
@@ -171,25 +178,24 @@ class Nerif:
         try_id = 0
         result = ""
 
+        # Try logits mode first
         while try_id < max_retry:
-            result = self.agent.chat(user_prompt, max_tokens=10)
-            if self.verification.verify(result):
-                if result == "True":
-                    return True
-                else:
-                    return False
-            simple_fit = self.verification.simple_fit(result)
-            if simple_fit is not None:
-                if simple_fit == "True":
-                    return True
-                else:
-                    return False
-            try_id += 1
-            self.agent.temperature = max(1.0, self.agent.temperature + 0.1)
-        result = self.verification.force_fit(result)
-
-        if result == "True":
-            return True
+            result = self.logits_mode(text)
+            if result is not None:
+                continue
+            elif result == "True":
+                return True
+            else:
+                return False
+        # Use embedding mode as fallback
+        result = self.embedding_mode(text)
+        if result is not None:
+            return result
+        # Use simple fit as fallback
+        result = self.verification.simple_fit(text)
+        if result is not None:
+            if result == "True":
+                return True
         else:
             return False
 

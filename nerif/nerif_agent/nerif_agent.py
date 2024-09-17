@@ -1,7 +1,7 @@
 import json
 import os
 from typing import List, Any, Union, Dict, Optional
-from litellm import completion
+from litellm import completion, embedding
 import requests
 from openai import OpenAI
 
@@ -24,6 +24,35 @@ OPENAI_MODEL: List[str] = [
     "gpt-4-turbo-2024-04-09",
     "gpt-4-turbo-2024-04-09-preview",
 ]
+OPENAI_EMBEDDING_MODEL: List[str] = [
+    "text-embedding-3-small",
+    "text-embedding-3-large",
+    "text-embedding-ada-002",
+]
+
+def get_litellm_embedding(
+    messages: str,
+    model: str = "gpt-3.5-turbo",
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> Any:
+    if model in OPENAI_EMBEDDING_MODEL:
+        if api_key is None or api_key == "":
+            api_key = os.environ.get("OPENAI_API_KEY")
+        if base_url is None or base_url == "":
+            base_url = os.environ.get("OPENAI_API_BASE")
+        os.environ["OPENAI_API_KEY"] = api_key
+        os.environ["OPENAI_API_BASE"] = base_url
+    
+    response = embedding(
+        model=model,
+        input=messages,
+        api_key=api_key,
+        base_url=base_url,
+    )
+
+    print(response)
+    return response
 
 
 def get_litellm_response(
@@ -245,29 +274,37 @@ class SimpleEmbeddingAgent:
         self.api_key = api_key
 
     def encode(self, string: str) -> List[float]:
-        if self.proxy_url is None or self.proxy_url == "":
-            client = OpenAI(api_key=self.api_key)
-            response = client.embeddings.create(input=string, model=self.model)
-            result = response.data[0].embedding
-        else:
-            payload = json.dumps({"model": self.model, "input": string})
-            headers = {
-                "Accept": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-                "User-Agent": "Apifox/1.0.0 (https://apifox.com)",
-                "Content-Type": "application/json",
-            }
-            response = requests.request(
-                "POST", f"{self.proxy_url}/v1/embeddings", headers=headers, data=payload
-            )
-            if response.status_code != 200:
-                raise Exception(f"Failed to call the proxy server: {response.text}")
-            else:
-                response_text = response.text
-                result_json = json.loads(response_text)
-                result = result_json["data"][0]["embedding"]
+        # if self.proxy_url is None or self.proxy_url == "":
+        #     client = OpenAI(api_key=self.api_key)
+        #     response = client.embeddings.create(input=string, model=self.model)
+        #     result = response.data[0].embedding
+        # else:
+        #     payload = json.dumps({"model": self.model, "input": string})
+        #     headers = {
+        #         "Accept": "application/json",
+        #         "Authorization": f"Bearer {self.api_key}",
+        #         "User-Agent": "Apifox/1.0.0 (https://apifox.com)",
+        #         "Content-Type": "application/json",
+        #     }
+        #     response = requests.request(
+        #         "POST", f"{self.proxy_url}/v1/embeddings", headers=headers, data=payload
+        #     )
+        #     if response.status_code != 200:
+        #         raise Exception(f"Failed to call the proxy server: {response.text}")
+        #     else:
+        #         response_text = response.text
+        #         result_json = json.loads(response_text)
+        #         result = result_json["data"][0]["embedding"]
+        
+        result = get_litellm_embedding(
+            messages=string,
+            model=self.model,
+            api_key=self.api_key,
+            base_url=self.proxy_url,
+        )
+        print(result)
 
-        return result
+        return result.data[0].embedding
 
 
 class LogitsAgent:
