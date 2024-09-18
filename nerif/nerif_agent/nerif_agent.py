@@ -1,12 +1,11 @@
 import json
 import os
-from typing import List, Any, Union, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
+
 from litellm import completion, embedding
-import requests
 from openai import OpenAI
 
 # OpenAI Models
-# From: https://platform.openai.com/docs/models/gpt-4o
 OPENAI_MODEL: List[str] = [
     "gpt-3.5-turbo",
     "gpt-4o",
@@ -30,19 +29,23 @@ OPENAI_EMBEDDING_MODEL: List[str] = [
     "text-embedding-ada-002",
 ]
 
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
+OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
+NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
+
 def get_litellm_embedding(
     messages: str,
-    model: str = "gpt-3.5-turbo",
+    model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
 ) -> Any:
     if model in OPENAI_EMBEDDING_MODEL:
         if api_key is None or api_key == "":
-            api_key = os.environ.get("OPENAI_API_KEY")
+            api_key = OPENAI_API_KEY
         if base_url is None or base_url == "":
-            base_url = os.environ.get("OPENAI_API_BASE")
-        os.environ["OPENAI_API_KEY"] = api_key
-        os.environ["OPENAI_API_BASE"] = base_url
+            base_url = OPENAI_API_BASE
     
     response = embedding(
         model=model,
@@ -56,7 +59,7 @@ def get_litellm_embedding(
 
 def get_litellm_response(
     messages: List[Dict[str, str]],
-    model: str = "gpt-3.5-turbo",
+    model: str = NERIF_DEFAULT_LLM_MODEL,
     temperature: float = 0,
     max_tokens: int = 300,
     stream: bool = False,
@@ -82,14 +85,12 @@ def get_litellm_response(
     """
     if model in OPENAI_MODEL:
         if api_key is None or api_key == "":
-            api_key = os.environ.get("OPENAI_API_KEY")
+            api_key = OPENAI_API_KEY
         if base_url is None or base_url == "":
-            base_url = os.environ.get("OPENAI_API_BASE")
-        os.environ["OPENAI_API_KEY"] = api_key
-        os.environ["OPENAI_API_BASE"] = base_url
-    else:
-        # Current support claude
-        os.environ["CLAUDE_API_KEY"] = api_key
+            base_url = OPENAI_API_BASE
+    # else:
+    #     # Current support claude
+    #     os.environ["CLAUDE_API_KEY"] = api_key
 
     if logprobs:
         responses = completion(
@@ -178,17 +179,17 @@ class SimpleChatAgent:
         self,
         proxy_url: Optional[str] = None,
         api_key: Optional[str] = None,
-        model: str = "gpt-3.5-turbo",
+        model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
     ):
         # Set the proxy URL and API key
         if proxy_url is None or proxy_url == "":
-            proxy_url = os.environ.get("OPENAI_PROXY_URL")
+            proxy_url = OPENAI_PROXY_URL
         elif proxy_url[-1] == "/":
             proxy_url = proxy_url[:-1]
         if api_key is None or api_key == "":
-            api_key = os.environ.get("OPENAI_API_KEY")
+            api_key = OPENAI_API_KEY
 
         # Set the model, temperature, proxy URL, and API key
         self.model = model
@@ -263,11 +264,11 @@ class SimpleEmbeddingAgent:
         model: str = "text-embedding-3-small",
     ):
         if proxy_url is None or proxy_url == "":
-            proxy_url = os.environ.get("OPENAI_PROXY_URL")
+            proxy_url = OPENAI_PROXY_URL
         elif proxy_url[-1] == "/":
             proxy_url = proxy_url[:-1]
         if api_key is None or api_key == "":
-            api_key = os.environ.get("OPENAI_API_KEY")
+            api_key = OPENAI_API_KEY
         
 
         self.model = model
@@ -305,16 +306,16 @@ class LogitsAgent:
         self,
         proxy_url: Optional[str] = None,
         api_key: Optional[str] = None,
-        model: str = "gpt-3.5-turbo",
+        model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
     ):
         if proxy_url is None or proxy_url == "":
-            proxy_url = os.environ.get("OPENAI_PROXY_URL")
+            proxy_url = OPENAI_PROXY_URL
         elif proxy_url[-1] == "/":
             proxy_url = proxy_url[:-1]
         if api_key is None or api_key == "":
-            api_key = os.environ.get("OPENAI_API_KEY")
+            api_key = OPENAI_API_KEY
 
         self.model = model
         self.proxy_url = proxy_url
@@ -331,7 +332,6 @@ class LogitsAgent:
     def chat(
         self,
         message: str,
-        append: bool = False,
         max_tokens: int = 300,
         logprobs: bool = True,
         top_logprobs: int = 5,

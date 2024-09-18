@@ -1,14 +1,20 @@
 import os
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from openai import OpenAI
-from typing import List, Any, Union, Dict, Optional
 
-from nerif.nerif_agent.nerif_agent import SimpleEmbeddingAgent, SimpleChatAgent, LogitsAgent
+from nerif.nerif_agent.nerif_agent import (
+    LogitsAgent,
+    SimpleChatAgent,
+    SimpleEmbeddingAgent,
+)
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
-
+OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
+NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
 def similarity_dist(vec1, vec2, func="cosine"):
     if func == "cosine":
@@ -40,7 +46,7 @@ class NerifVeification:
     def __init__(
         self,
         possible_value: List[str] = None,
-        model: str = "text-embedding-3-small",
+        model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
         value_instruction: List[str] = None,
     ):
         if possible_value == [] or possible_value is None:
@@ -115,7 +121,7 @@ class Nerif:
     Embedding mode is slower, but more accurate. Embed the text and compare with the possible values.
     
     Attributes:
-        model: str = "gpt-4o"
+        model: str = NERIF_DEFAULT_LLM_MODEL
         temperature: float = 0
         debug: bool = False
         
@@ -126,11 +132,11 @@ class Nerif:
             Judge the truthfulness of the statement using embedding mode.
         judge(text: str, max_retry: int = 3) -> bool:
             Judge the truthfulness of the statement.
-        instance(text: str, max_retry: int = 3, model: str = "gpt-4o", debug: bool = False) -> bool:
+        instance(text: str, max_retry: int = 3, model: str = NERIF_DEFAULT_LLM_MODEL, debug: bool = False) -> bool:
             Judge the truthfulness of the statement.
     """
     
-    def __init__(self, model="gpt-4o", temperature=0, debug=False):
+    def __init__(self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, debug=False):
         self.model = model
         self.prompt = (
             "Given the following text, determine if the statement is true or false.\n"
@@ -161,6 +167,7 @@ class Nerif:
         if self.debug:
             print("Logits mode, response:", response)
         # Fetch the logprobs of the logits
+        # TODO: if LLM don't have logprobs, we need to use another method to get the result
         logprobs = response.choices[0].logprobs["content"][0]
         sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
         # Try to find the most likely logprob
@@ -234,31 +241,27 @@ class Nerif:
         return new_instance.judge(text, max_retry=max_retry)
 
 
-def nerif(text, model="gpt-4o", debug=False):
+def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, debug=False):
     return Nerif.instance(text, model=model, debug=debug)
 
 
 class NerifMatch:
-    def __init__(self, choice_dict, model="gpt-4o", temperature=0):
-        self.choice = choice_dict
+    def __init__(self, requirement, choices, model=NERIF_DEFAULT_LLM_MODEL, temperature=0):
+        self.requirement = requirement
+        self.choices = choices
         self.model = model
         self.prompt = (
-            "Given the following text, determine the best route to take.\n"
+            "Given the following text, determine the best choice to make.\n"
             "If it is hard to make the decision, choose the one you think is the most proper.\n"
             "<options>"
         )
         index = 0
-        for _, value in self.choice.items():
+        for item in self.choices:
             index += 1
-            self.prompt += (
-                f"<option>"
-                f"<id>{index}</id>"
-                f"<description>{value}</description>"
-                f"</option>\n"
-            )
+            self.prompt += f"{index}. {item}\n"
         self.prompt += "</options>"
         self.prompt += (
-            "Choose the best route from the following options.\n"
+            "Choose the best choice from the following options.\n"
             "Only give me the choice ID, only a number"
         )
         self.temperature = temperature
@@ -266,10 +269,8 @@ class NerifMatch:
             model=model, temperature=temperature, default_prompt=self.prompt
         )
         self.verification = NerifVeification(
-            possible_value=[str(x) for x in range(1, index + 1)]
-        )
-        self.complex_verification = NerifVeification(
-            possible_value=[value for value in self.choice.values()]
+            possible_value=[str(x) for x in range(1, index + 1)],
+            value_instruction=self.choices
         )
 
     def id_to_key(self, index):
@@ -307,10 +308,10 @@ class NerifMatch:
         raise Exception("Failed to verify the result in switch.")
 
     @classmethod
-    def instance(cls, selections, text, max_retry=5, model="gpt-4o"):
+    def instance(cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL):
         new_instance = cls(selections, model=model)
         return new_instance.match(text, max_retry=max_retry)
 
 
-def nerif_match(text, selections, model="gpt-4o"):
+def nerif_match(text, selections, model=NERIF_DEFAULT_LLM_MODEL):
     return NerifMatch.instance(selections, text, model=model)

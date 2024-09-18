@@ -30,13 +30,11 @@ addopts = [
     "--import-mode=importlib",
 ]
 
-
 [project.optional-dependencies]
 dev = ["black", "bumpver", "isort", "pip-tools", "pytest", "ipython"]
 
 [project.urls]
 Homepage = "https://github.com/Chivier/nerif"
-
 
 [tool.bumpver]
 current_version = "0.3.2"
@@ -49,3 +47,15 @@ push            = false
 [tool.bumpver.file_patterns]
 "pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
 
+[tool.black]
+line-length = 120
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 88
