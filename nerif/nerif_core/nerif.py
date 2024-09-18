@@ -108,6 +108,28 @@ class NerifVeification:
 
 
 class Nerif:
+    """
+    This class is used to judge the truthfulness of a statement.
+    It uses two modes: logits mode and embedding mode.
+    Logits mode is faster, but less accurate. Fetch top logprobs from the logits.
+    Embedding mode is slower, but more accurate. Embed the text and compare with the possible values.
+    
+    Attributes:
+        model: str = "gpt-4o"
+        temperature: float = 0
+        debug: bool = False
+        
+    Methods:
+        logits_mode(text: str) -> bool:
+            Judge the truthfulness of the statement using logits mode.
+        embedding_mode(text: str) -> bool:
+            Judge the truthfulness of the statement using embedding mode.
+        judge(text: str, max_retry: int = 3) -> bool:
+            Judge the truthfulness of the statement.
+        instance(text: str, max_retry: int = 3, model: str = "gpt-4o", debug: bool = False) -> bool:
+            Judge the truthfulness of the statement.
+    """
+    
     def __init__(self, model="gpt-4o", temperature=0, debug=False):
         self.model = model
         self.prompt = (
