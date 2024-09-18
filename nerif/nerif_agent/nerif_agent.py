@@ -51,7 +51,6 @@ def get_litellm_embedding(
         base_url=base_url,
     )
 
-    print(response)
     return response
 
 
@@ -259,6 +258,7 @@ class SimpleEmbeddingAgent:
     def __init__(
         self,
         proxy_url: Optional[str] = None,
+        base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         model: str = "text-embedding-3-small",
     ):
@@ -268,43 +268,20 @@ class SimpleEmbeddingAgent:
             proxy_url = proxy_url[:-1]
         if api_key is None or api_key == "":
             api_key = os.environ.get("OPENAI_API_KEY")
+        
 
         self.model = model
         self.proxy_url = proxy_url
         self.api_key = api_key
 
     def encode(self, string: str) -> List[float]:
-        # if self.proxy_url is None or self.proxy_url == "":
-        #     client = OpenAI(api_key=self.api_key)
-        #     response = client.embeddings.create(input=string, model=self.model)
-        #     result = response.data[0].embedding
-        # else:
-        #     payload = json.dumps({"model": self.model, "input": string})
-        #     headers = {
-        #         "Accept": "application/json",
-        #         "Authorization": f"Bearer {self.api_key}",
-        #         "User-Agent": "Apifox/1.0.0 (https://apifox.com)",
-        #         "Content-Type": "application/json",
-        #     }
-        #     response = requests.request(
-        #         "POST", f"{self.proxy_url}/v1/embeddings", headers=headers, data=payload
-        #     )
-        #     if response.status_code != 200:
-        #         raise Exception(f"Failed to call the proxy server: {response.text}")
-        #     else:
-        #         response_text = response.text
-        #         result_json = json.loads(response_text)
-        #         result = result_json["data"][0]["embedding"]
-        
         result = get_litellm_embedding(
             messages=string,
             model=self.model,
-            api_key=self.api_key,
-            base_url=self.proxy_url,
+            api_key=self.api_key
         )
-        print(result)
 
-        return result.data[0].embedding
+        return result.data[0]["embedding"]
 
 
 class LogitsAgent:

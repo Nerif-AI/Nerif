@@ -108,7 +108,7 @@ class NerifVeification:
 
 
 class Nerif:
-    def __init__(self, model="gpt-4o", temperature=0):
+    def __init__(self, model="gpt-4o", temperature=0, debug=False):
         self.model = model
         self.prompt = (
             "Given the following text, determine if the statement is true or false.\n"
@@ -123,19 +123,29 @@ class Nerif:
             model=model, temperature=temperature
         )
         self.verification = NerifVeification()
+        self.debug = debug
+        
+        if self.debug:
+            print("Nerif initialized with model:", model, "temperature:", temperature, "debug:", debug)
 
     def logits_mode(self, text: str):
+        if self.debug:
+            print("Logits mode, text:", text)
         self.agent.temperature = self.temperature
         # replace <question> with the text
         question = "<question>\n" + text + "</question>\n"
         user_prompt = self.prompt.replace("<question>", question)
         response = self.logits_agent.chat(user_prompt, max_tokens=1)
+        if self.debug:
+            print("Logits mode, response:", response)
         # Fetch the logprobs of the logits
-        logprobs = response.logprobs
-        sorted_logprobs = sorted(logprobs.logprobs, key=lambda x: x.logprob, reverse=True)
+        logprobs = response.choices[0].logprobs["content"][0]
+        sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
         # Try to find the most likely logprob
         for index in range(len(sorted_logprobs)):
-            simple_fit = self.verification.simple_fit(sorted_logprobs[index].token)
+            if self.debug:
+                print("Logits mode, sorted_logprobs[index]:", sorted_logprobs[index]["token"])
+            simple_fit = self.verification.simple_fit(sorted_logprobs[index]["token"])
             if simple_fit is not None:
                 if simple_fit == "True":
                     return True
@@ -144,6 +154,8 @@ class Nerif:
         return None
     
     def embedding_mode(self, text: str):
+        if self.debug:
+            print("Embedding mode, text:", text)
         self.agent.temperature = self.temperature
         # replace <question> with the text
         question = "<question>\n" + text + "</question>\n"
@@ -167,6 +179,8 @@ class Nerif:
             return False
     
     def judge(self, text, max_retry=3):
+        if self.debug:
+            print("Judge, text:", text)
         self.agent.temperature = self.temperature
         user_prompt = (
             f"Now the question is:"
@@ -181,32 +195,25 @@ class Nerif:
         # Try logits mode first
         while try_id < max_retry:
             result = self.logits_mode(text)
-            if result is not None:
+            try_id += 1
+            if result is None:
+                if self.debug:
+                    print("logits mode failed, {} try".format(try_id))
                 continue
-            elif result == "True":
-                return True
             else:
-                return False
+                return result
         # Use embedding mode as fallback
         result = self.embedding_mode(text)
-        if result is not None:
-            return result
-        # Use simple fit as fallback
-        result = self.verification.simple_fit(text)
-        if result is not None:
-            if result == "True":
-                return True
-        else:
-            return False
-
+        return result
+    
     @classmethod
-    def instance(cls, text, max_retry=5, model="gpt-4o"):
-        new_instance = cls(model=model)
+    def instance(cls, text, max_retry=5, model="gpt-4o", debug=False):
+        new_instance = cls(model=model, debug=debug)
         return new_instance.judge(text, max_retry=max_retry)
 
 
-def nerif(text, model="gpt-4o"):
-    return Nerif.instance(text, model=model)
+def nerif(text, model="gpt-4o", debug=False):
+    return Nerif.instance(text, model=model, debug=debug)
 
 
 class NerifMatch:
