@@ -5,6 +5,10 @@ from litellm import completion, embedding
 import requests
 from openai import OpenAI
 
+from .nerif_api_store import OpenAIAPIStore
+
+OpenAIAPIStore.setup_from_env()
+
 # OpenAI Models
 # From: https://platform.openai.com/docs/models/gpt-4o
 OPENAI_MODEL: List[str] = [
@@ -37,12 +41,13 @@ def get_litellm_embedding(
     base_url: Optional[str] = None,
 ) -> Any:
     if model in OPENAI_EMBEDDING_MODEL:
-        if api_key is None or api_key == "":
-            api_key = os.environ.get("OPENAI_API_KEY")
-        if base_url is None or base_url == "":
-            base_url = os.environ.get("OPENAI_API_BASE")
-        os.environ["OPENAI_API_KEY"] = api_key
-        os.environ["OPENAI_API_BASE"] = base_url
+        # if api_key is None or api_key == "":
+        #     api_key = os.environ.get("OPENAI_API_KEY")
+        # if base_url is None or base_url == "":
+        #     base_url = os.environ.get("OPENAI_API_BASE")
+        # os.environ["OPENAI_API_KEY"] = api_key
+        # os.environ["OPENAI_API_BASE"] = base_url
+        OpenAIAPIStore.set_env()
     
     response = embedding(
         model=model,
@@ -82,12 +87,13 @@ def get_litellm_response(
     - list: A list of generated text responses if messages is a list, otherwise a single text response.
     """
     if model in OPENAI_MODEL:
-        if api_key is None or api_key == "":
-            api_key = os.environ.get("OPENAI_API_KEY")
-        if base_url is None or base_url == "":
-            base_url = os.environ.get("OPENAI_API_BASE")
-        os.environ["OPENAI_API_KEY"] = api_key
-        os.environ["OPENAI_API_BASE"] = base_url
+        # if api_key is None or api_key == "":
+        #     api_key = os.environ.get("OPENAI_API_KEY")
+        # if base_url is None or base_url == "":
+        #     base_url = os.environ.get("OPENAI_API_BASE")
+        # os.environ["OPENAI_API_KEY"] = api_key
+        # os.environ["OPENAI_API_BASE"] = base_url
+        OpenAIAPIStore.set_env()
     else:
         # Current support claude
         os.environ["CLAUDE_API_KEY"] = api_key
@@ -183,13 +189,13 @@ class SimpleChatAgent:
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
     ):
-        # Set the proxy URL and API key
-        if proxy_url is None or proxy_url == "":
-            proxy_url = os.environ.get("OPENAI_PROXY_URL")
-        elif proxy_url[-1] == "/":
-            proxy_url = proxy_url[:-1]
-        if api_key is None or api_key == "":
-            api_key = os.environ.get("OPENAI_API_KEY")
+        # # Set the proxy URL and API key
+        # if proxy_url is None or proxy_url == "":
+        #     proxy_url = os.environ.get("OPENAI_PROXY_URL")
+        # elif proxy_url[-1] == "/":
+        #     proxy_url = proxy_url[:-1]
+        # if api_key is None or api_key == "":
+        #     api_key = os.environ.get("OPENAI_API_KEY")
 
         # Set the model, temperature, proxy URL, and API key
         self.model = model
@@ -304,7 +310,7 @@ class SimpleEmbeddingAgent:
         )
         print(result)
 
-        return result.data[0].embedding
+        return result.data[0]['embedding']
 
 
 class LogitsAgent:

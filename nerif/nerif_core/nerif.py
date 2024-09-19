@@ -131,11 +131,11 @@ class Nerif:
         user_prompt = self.prompt.replace("<question>", question)
         response = self.logits_agent.chat(user_prompt, max_tokens=1)
         # Fetch the logprobs of the logits
-        logprobs = response.logprobs
-        sorted_logprobs = sorted(logprobs.logprobs, key=lambda x: x.logprob, reverse=True)
+        logprobs = response.choices[0].logprobs
+        sorted_logprobs = sorted(logprobs.get('content')[0].get('top_logprobs'), key=lambda x: x['logprob'], reverse=True)
         # Try to find the most likely logprob
         for index in range(len(sorted_logprobs)):
-            simple_fit = self.verification.simple_fit(sorted_logprobs[index].token)
+            simple_fit = self.verification.simple_fit(sorted_logprobs[index]['token'])
             if simple_fit is not None:
                 if simple_fit == "True":
                     return True
@@ -181,8 +181,11 @@ class Nerif:
         # Try logits mode first
         while try_id < max_retry:
             result = self.logits_mode(text)
-            if result is not None:
+            if result is None:
+                try_id += 1
                 continue
+            elif isinstance(result, bool):
+                return result
             elif result == "True":
                 return True
             else:
