@@ -23,6 +23,10 @@ OPENAI_MODEL: List[str] = [
     "gpt-4-turbo-2024-04-09",
     "gpt-4-turbo-2024-04-09-preview",
 ]
+OPENAI_MODEL_STRUCTURED: List[str] = [
+    "gpt-4o-2024-08-06",
+    "gpt-4o-mini-2024-07-18"
+]
 OPENAI_EMBEDDING_MODEL: List[str] = [
     "text-embedding-3-small",
     "text-embedding-3-large",
@@ -67,6 +71,7 @@ def get_litellm_response(
     base_url: Optional[str] = None,
     logprobs: bool = False,
     top_logprobs: int = 5,
+    response_format = None,
 ) -> Any:
     """
     Get a text response from an OpenAI model.
@@ -101,6 +106,15 @@ def get_litellm_response(
             stream=stream,
             logprobs=logprobs,
             top_logprobs=top_logprobs,
+        )
+    elif response_format is not None:
+        responses = completion(
+            model = model,
+            messages = messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=stream,
+            response_format=response_format
         )
     else:
         responses = completion(
@@ -153,7 +167,7 @@ def get_ollama_response(
     )
 
     return response
-
+    
 
 class SimpleChatAgent:
     """
@@ -284,6 +298,40 @@ class SimpleEmbeddingAgent:
 
         return result.data[0]["embedding"]
 
+class StructuredAgent(SimpleChatAgent):
+    
+    def __init__(
+        self, 
+        proxy_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model: str = NERIF_DEFAULT_LLM_MODEL,
+        default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
+        temperature: float = 0.0,
+    ):
+        super().__init__(proxy_url, api_key, model, default_prompt, temperature)
+    
+    def chat(
+        self, 
+        message: str,
+        max_tokens: int = 300,
+        response_format = None,
+    ):
+        assert response_format is not None, "requrest_format must be provided"
+        new_message = {"role": "user", "content": message}
+        self.messages.append(new_message)
+        
+        if self.model in OPENAI_MODEL:
+            result = get_litellm_response(
+                self.messages,
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=max_tokens,
+                response_format=response_format,
+            )
+        else:
+            raise ValueError(f"Model {self.model} not supported")
+        
+        return result
 
 class LogitsAgent:
     # TODO: support ollama logits model

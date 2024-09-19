@@ -5,11 +5,16 @@ import warnings
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from pydantic import BaseModel
+
 from nerif.nerif_agent.nerif_agent import (
     LogitsAgent,
     SimpleChatAgent,
     SimpleEmbeddingAgent,
+    StructuredAgent
 )
+
+print("Testing model {}".format(os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")))
 
 
 class TestNerifAgent(unittest.TestCase):
@@ -44,6 +49,23 @@ class TestNerifAgent(unittest.TestCase):
         print(result)
         self.assertIsNotNone(result)
     
+    def test_structured_agent(self):
+        import litellm
+        litellm.enable_json_schema_validation = True
+        litellm.set_verbose = True # see the raw request made by litellm
+        class ResponseFormat(BaseModel):
+            year: int
+            model: str
+            cpu_name: str
+        structured_agent = StructuredAgent(model="gpt-4o-2024-08-06")
+        result = structured_agent.chat("Which iPhone is published at 2012? Reply in json.", response_format=ResponseFormat)
+        # result = structured_agent.chat("Which iPhone is published at 2012? Fill following json {\"year\": <>, \"model name\": <>}", response_format={"type": "json_object"})
+        print(result)
+        self.assertIsNotNone(result)
+        self.assertIn("iphone 5", result["model"].lower())
+        self.assertIn("A6", result["cpu_name"])
+        self.assertEqual(result["year"], 2012)
+    
     def test_ollama_agent(self):
         ollama_agent = SimpleChatAgent(model="ollama/llama3.1")
         result = ollama_agent.chat("Hello, how are you?")
@@ -53,4 +75,4 @@ class TestNerifAgent(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)
