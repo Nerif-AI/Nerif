@@ -422,7 +422,7 @@ class NerifMatch:
 
     @classmethod
     def instance(cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL):
-        new_instance = cls(selections, model=model)
+        new_instance = cls(choice=selections, model=model)
         return new_instance.match(text, max_retry=max_retry)
 
 
