@@ -309,6 +309,9 @@ class StructuredAgent(SimpleChatAgent):
         temperature: float = 0.0,
     ):
         super().__init__(proxy_url, api_key, model, default_prompt, temperature)
+        # check model support structured response
+        if model not in OPENAI_MODEL_STRUCTURED:
+            raise ValueError(f"Model {model} not supported structured response")
     
     def chat(
         self, 
@@ -330,7 +333,7 @@ class StructuredAgent(SimpleChatAgent):
             )
         else:
             raise ValueError(f"Model {self.model} not supported")
-        
+
         return result
 
 class LogitsAgent:
