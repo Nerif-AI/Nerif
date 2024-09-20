@@ -13,6 +13,12 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, judge)  # add assertion here
         judge = nerif("Do you know who I am?")
         self.assertEqual(False, judge)
+        
+        # test structured request
+        judge = nerif("the sky is blue", model="gpt-4o-2024-08-06")
+        self.assertEqual(True, judge)  # add assertion here
+        judge = nerif("Do you know who I am?", model="gpt-4o-2024-08-06")
+        self.assertEqual(False, judge)
 
     # def test_match(self):
     #     test_selection = {
@@ -37,11 +43,9 @@ class MyTestCase(unittest.TestCase):
         # litellm.set_verbose = True 
         nerif_format = NerifFormat(model="gpt-4o-2024-08-06")
         choice_cls = nerif_format.format_request(RandomNumber, "Generate a random number between 50 and 100")
-        print(choice_cls)
         self.assertLessEqual(50, choice_cls.number)
         self.assertGreaterEqual(100, choice_cls.number)
         choice_float = nerif_format.format_request(float, "Generate a random float number between 1 and 9")
-        print(choice_float)
         self.assertLessEqual(1, choice_float)
         self.assertGreaterEqual(9, choice_float)
         
