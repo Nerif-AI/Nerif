@@ -12,7 +12,8 @@ from nerif.nerif_agent.nerif_agent import (
     LogitsAgent,
     SimpleChatAgent,
     SimpleEmbeddingAgent,
-    StructuredAgent
+    StructuredAgent,
+    OPENAI_MODEL_STRUCTURED
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ class NerifFormat:
         self, 
         model: str = NERIF_DEFAULT_LLM_MODEL,
         temperature = 0,
+        default_prompt = None,
         debug = False
     ):
         self.debug = debug
@@ -48,10 +50,12 @@ class NerifFormat:
         self.builtins = dir(builtins)
         
         self.agent = StructuredAgent(model=model, temperature=temperature)
-        self.prompt = self.prompt = (
+        self.prompt = (
             "Reply the following question by filling the format I give you.\n"
             "<question>\n"
         )
+        if default_prompt is not None:
+            self.prompt = default_prompt
         pass
 
     def wrap_cls(self, cls):
@@ -218,12 +222,29 @@ class Nerif:
         self.logits_agent = LogitsAgent(
             model=model, temperature=temperature
         )
+        if self.model in OPENAI_MODEL_STRUCTURED:
+            self.structured_request = NerifFormat(model=model, temperature=temperature)
         self.verification = NerifVeification()
         self.debug = debug
         
         if self.debug:
             print("Nerif initialized with model:", model, "temperature:", temperature, "debug:", debug)
 
+    def structured_mode(self, text: str, max_retry=5):
+        if self.debug:
+            print("Structured mode, text: ", text)
+        self.structured_request.temperature = self.temperature
+        try_id = 0
+        while try_id < max_retry:
+            choice = self.structured_request.format_request(bool, text)
+            if self.verification.verify(str(choice)):
+                # pass verification
+                return choice
+            self.structured_request.temperature += 0.1
+            try_id += 1
+        return None
+        
+        
     def logits_mode(self, text: str):
         if self.debug:
             print("Logits mode, text:", text)
@@ -289,6 +310,11 @@ class Nerif:
         try_id = 0
         result = ""
 
+        # Try structured mode first
+        if self.model in OPENAI_MODEL_STRUCTURED:
+            result = self.structured_mode(text)
+            if result is not None:
+                return result
         # Try logits mode first
         while try_id < max_retry:
             result = self.logits_mode(text)
@@ -336,6 +362,8 @@ class NerifMatch:
         self.agent = SimpleChatAgent(
             model=model, temperature=temperature, default_prompt=self.prompt
         )
+        if model in OPENAI_MODEL_STRUCTURED:
+            self.structured_request = NerifFormat(model=model, temperature=temperature, default_prompt=self.prompt)
         self.verification = NerifVeification(
             possible_value=[str(x) for x in range(1, index + 1)],
             value_instruction=self.choices
@@ -344,6 +372,19 @@ class NerifMatch:
     def id_to_key(self, index):
         return list(self.choice.keys())[index - 1]
 
+    def formated_mode(self, text, max_retry=5):
+        self.structured_request.temperature = self.temperature
+        try_id = 0
+        while try_id < max_retry:
+            choice = self.structured_request.format_request(int, text)
+            if self.verification.verify(str(choice)):
+                # pass verification
+                return self.id_to_key(int(choice))
+            self.structured_request.temperature += 0.1
+            try_id += 1
+        return None
+
+        
     def match(self, text, max_retry=5):
         self.agent.temperature = self.temperature
         user_prompt = (
@@ -353,6 +394,10 @@ class NerifMatch:
             "Choose the best route from the following options.\n"
             "Only give me the choice ID, only a number"
         )
+        if self.model in OPENAI_MODEL_STRUCTURED:
+            choice = self.formated_mode(text, max_retry=max_retry)
+            if choice is not None:
+                return choice
         try_id = 0
         choice = ""
         while try_id < max_retry:
