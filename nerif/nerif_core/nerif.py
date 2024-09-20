@@ -1,6 +1,10 @@
 import os
+import inspect
+import logging
+import builtins
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
 import numpy as np
 from openai import OpenAI
 
@@ -8,7 +12,10 @@ from nerif.nerif_agent.nerif_agent import (
     LogitsAgent,
     SimpleChatAgent,
     SimpleEmbeddingAgent,
+    StructuredAgent
 )
+
+logger = logging.getLogger(__name__)
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
@@ -22,7 +29,68 @@ def similarity_dist(vec1, vec2, func="cosine"):
     else:
         return np.linalg.norm(vec1 - vec2)
 
+class NerifFormat:
+    """
+    This class is used to convert LLM's output to specific type/format.
+    
+    """
+    
+    def __init__(
+        self, 
+        model: str = NERIF_DEFAULT_LLM_MODEL,
+        temperature = 0,
+        debug = False
+    ):
+        self.debug = debug
+        self.simple = True # If the output is a simple variable
+        self.model = model
+        self.temperature = temperature
+        self.builtins = dir(builtins)
+        
+        self.agent = StructuredAgent(model=model, temperature=temperature)
+        self.prompt = self.prompt = (
+            "Reply the following question by filling the format I give you.\n"
+            "<question>\n"
+        )
+        pass
 
+    def wrap_cls(self, cls):
+        if not inspect.isclass(cls):
+            raise ValueError("The input should be a class.")
+        
+        if "builtins" in cls.__module__:
+            # Built-in class
+            self.simple = True
+            class RequestWrapper(BaseModel):
+                result: cls
+        else:
+            self.simple = False
+            class RequestWrapper(BaseModel, cls):
+                pass   
+        
+        return RequestWrapper
+
+    
+    def format_request(self, cls, text: str):
+        self.agent.reset()
+        if self.debug:
+            logger.debug("Formated requrest, text: %s", text)
+        response_format = self.wrap_cls(cls)
+        self.agent.temperature = self.temperature
+        question = "<question>\n" + text + "</question>\n"
+        self.prompt = self.prompt.replace("<question>", question)
+        response = self.agent.chat(self.prompt, response_format=response_format)
+        choice = response_format.model_validate_json(response.choices[0].message.content)
+        if self.debug:
+            print("Got response: {}".format(response))
+        if self.simple:
+            return choice.result
+        else:
+            return choice
+        
+    
+    
+    
 class NerifVeification:
     """
     This class is used to verify the result of the Nerif.

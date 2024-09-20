@@ -54,17 +54,33 @@ class TestNerifAgent(unittest.TestCase):
         litellm.enable_json_schema_validation = True
         litellm.set_verbose = True # see the raw request made by litellm
         class ResponseFormat(BaseModel):
-            year: int
+            published_year: int
             model: str
             cpu_name: str
+            exist: bool
         structured_agent = StructuredAgent(model="gpt-4o-2024-08-06")
-        result = structured_agent.chat("Which iPhone is published at 2012? Reply in json.", response_format=ResponseFormat)
-        # result = structured_agent.chat("Which iPhone is published at 2012? Fill following json {\"year\": <>, \"model name\": <>}", response_format={"type": "json_object"})
+        result = structured_agent.chat("Is iPhone XX exist? If exist, tell me the cpu name and its publish year, or just reply me not exit.", response_format=ResponseFormat)
         print(result)
-        self.assertIsNotNone(result)
-        self.assertIn("iphone 5", result["model"].lower())
-        self.assertIn("A6", result["cpu_name"])
-        self.assertEqual(result["year"], 2012)
+        choice = result.choices[0]
+        self.assertIsNotNone(choice)
+        content = ResponseFormat.model_validate_json(choice.message.content)
+        self.assertIn("iphone xx", content.model.lower())
+        self.assertEqual("", content.cpu_name)
+        self.assertEqual(content.published_year, 0)
+        class ResponseFormat(BaseModel):
+            number: int
+            upper_bound: int
+            lower_bound: int
+        structured_agent = StructuredAgent(model="gpt-4o-2024-08-06")
+        result = structured_agent.chat("Generate a random number between 1 to 100. Reply in json.", response_format=ResponseFormat)
+        choice = result.choices[0]
+        self.assertIsNotNone(choice)
+        content = ResponseFormat.model_validate_json(choice.message.content)
+        self.assertIsInstance(content.number, int)
+        self.assertGreaterEqual(content.number, content.lower_bound)
+        self.assertLessEqual(content.number, content.upper_bound)
+        
+        
     
     def test_ollama_agent(self):
         ollama_agent = SimpleChatAgent(model="ollama/llama3.1")
