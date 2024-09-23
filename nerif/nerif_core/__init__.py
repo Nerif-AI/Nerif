@@ -1,1 +1,1 @@
-from .nerif import Nerif, NerifMatch, nerif, nerif_match
+from .nerif import Nerif, NerifMatchString, nerif, nerif_match_string

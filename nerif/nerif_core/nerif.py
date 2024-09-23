@@ -16,6 +16,7 @@ OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
 NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
+
 def similarity_dist(vec1, vec2, func="cosine"):
     if func == "cosine":
         return 1 - (vec1 @ vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
@@ -23,75 +24,66 @@ def similarity_dist(vec1, vec2, func="cosine"):
         return np.linalg.norm(vec1 - vec2)
 
 
-class NerifVeification:
+class NerificationBase:
     """
+    Base class for Nerification.
     This class is used to verify the result of the Nerif.
-    If the result is in the possible_value, return the item.
-    If the result is not in the possible_value, return None.
-
-    Attributes:
-        possible: list[str] = None, model="text-embedding-3-small"
-        model: str = "text-embedding-3-small"
-        embedding_model: str = "text-embedding-3-small"
-
-    Methods:
-        verify(text: str) -> bool:
-            Verify if the text is in the possible_value.
-        simple_fit(text: str) -> str:
-            Find the best fit in the possible_value.
-        force_fit(text: str, similarity="cosine") -> str:
-            Find the best fit in the possible_value.
     """
 
-    def __init__(
-        self,
-        possible_value: List[str] = None,
-        model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
-        value_instruction: List[str] = None,
-    ):
-        if possible_value == [] or possible_value is None:
-            possible_value = ["True", "False"]
-        self.original_options = possible_value
+    def __init__(self, possible_values: Optional[List[Any]] = None, model: str = NERIF_DEFAULT_EMBEDDING_MODEL):
+        """
+        Initialize the NerificationBase.
+        possible_values: list[Any] = None
+        model: str = NERIF_DEFAULT_EMBEDDING_MODEL
+
+        possible_values: list of possible values to verify. Only store lower case string
+        """
+        self.original_options = possible_values
         # Convert the possible value to lower case
         self.possible = []
-        # (Optional) Additional instructions for each possible value
-        self.possible_instruction = []
-        # If possible_instruction is not None, record the instruction for each possible value
-        for index in range(len(possible_value)):
-            self.possible.append(possible_value[index].lower())
-            if value_instruction is not None:
-                self.possible_instruction.append(value_instruction[index])
-            else:
-                self.possible_instruction.append("")
+
+        for index in range(len(possible_values)):
+            self.possible.append(self.convert(possible_values[index]))
+
         self.embedding = SimpleEmbeddingAgent(model=model)
         self.possible_embed = []
-        self.instruction_embed = []
+
         # Embed the possible value and the possible instruction
         for index in range(len(self.possible)):
             self.possible_embed.append(self.embedding.encode(self.possible[index]))
-        if self.possible_instruction is not None:
-            for index in range(len(self.possible_instruction)):
-                self.instruction_embed.append(
-                    self.embedding.encode(self.possible_instruction[index])
-                )
 
-    def verify(self, text: str):
-        if text.lower() in self.possible:
+    def convert(self, val: Any):
+        """
+        Convert the value to lower case.
+        """
+        if isinstance(val, str):
+            return val.lower()
+        else:
+            return str(val).lower()
+
+    def verify(self, val: Any):
+        """
+        Verify if the text is in the possible_values.
+        """
+        if self.convert(val) in self.possible:
             return True
         return False
 
-    def simple_fit(self, text: str):
+    def simple_fit(self, val: Any):
         """
-        If there is a possible value in the text, return the original option.
+        Use the embedding model to find the best fit in the possible_values.
         """
-        text = text.lower()
+        text = self.convert(val)
         for index in range(len(self.possible)):
-            if self.possible[index].lower() in text:
+            if self.possible[index] in text:
                 return self.original_options[index]
         return None
 
-    def force_fit(self, text: str, similarity="cosine"):
-        text_embed = self.embedding.encode(text)
+    def force_fit(self, val: Any, similarity="cosine"):
+        """
+        Use the embedding model to find the best fit in the possible_values.
+        """
+        text_embed = self.embedding.encode(self.convert(val))
         min_dist = similarity_dist(text_embed, self.possible_embed[0], similarity)
         min_id = 0
         for index in range(1, len(self.possible_embed)):
@@ -100,17 +92,87 @@ class NerifVeification:
                 min_dist = dist
                 min_id = index
         return self.original_options[min_id]
-    
-    def instruction_fit(self, text: str, similarity="cosine"):
-        text_embed = self.embedding.encode(text)
-        min_dist = similarity_dist(text_embed, self.instruction_embed[0], similarity)
-        min_id = 0
-        for index in range(1, len(self.instruction_embed)):
-            dist = similarity_dist(text_embed, self.instruction_embed[index], similarity)
-            if dist < min_dist:
-                min_dist = dist
-                min_id = index
-        return self.original_options[min_id]
+
+
+# * How to build child class for NerificationBase:
+# * __init__: possible_values, model
+# * - convert possible_values to lower case string (implemented in convert method), store to `possible`
+# * - store the original possible_values to `original_options`
+# * - create a SimpleEmbeddingAgent with the model to `embedding`
+# * - store embedded possible_values to `possible_embed`
+# * convert: convert the value to lower case
+# * verify: check if the value is in the possible_values
+# * simple_fit: find the best fit in the possible_values
+# * force_fit: force find the best fit in possible_values using embedding
+
+
+class Nerification(NerificationBase):
+    """
+    Bool Value Verification
+    """
+
+    def __init__(
+        self,
+        model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
+    ):
+        super().__init__([True, False], model)
+
+    def convert(self, val: Any):
+        return str(val).lower()
+
+    def verify(self, val: Any):
+        return super().verify(val)
+
+    def simple_fit(self, val: Any):
+        return super().simple_fit(val)
+
+    def force_fit(self, val: Any, similarity="cosine"):
+        return super().force_fit(val, similarity)
+
+
+class NerificationString(NerificationBase):
+    """
+    String Value Verification
+    This class is used to verify the result of the Nerif.
+    If the result is in the possible_values, return the item.
+    If the result is not in the possible_values, return None.
+    """
+
+    def __init__(self, possible_values: Optional[List[str]] = None, model: str = NERIF_DEFAULT_EMBEDDING_MODEL):
+        super().__init__(possible_values, model)
+
+    def convert(self, val: Any):
+        return val.lower()
+
+    def verify(self, val: Any):
+        return super().verify(val)
+
+    def simple_fit(self, val: Any):
+        return super().simple_fit(val)
+
+    def force_fit(self, val: Any, similarity="cosine"):
+        return super().force_fit(val, similarity)
+
+
+class NerificationInt(NerificationBase):
+    """
+    Int Value Verification
+    """
+
+    def __init__(self, possible_values: Optional[List[int]] = None, model: str = NERIF_DEFAULT_EMBEDDING_MODEL):
+        super().__init__(possible_values, model)
+
+    def convert(self, val: Any):
+        return str(val)
+
+    def verify(self, val: Any):
+        return super().verify(val)
+
+    def simple_fit(self, val: Any):
+        return super().simple_fit(val)
+
+    def force_fit(self, val: Any, similarity="cosine"):
+        return super().force_fit(val, similarity)
 
 
 class Nerif:
@@ -119,12 +181,12 @@ class Nerif:
     It uses two modes: logits mode and embedding mode.
     Logits mode is faster, but less accurate. Fetch top logprobs from the logits.
     Embedding mode is slower, but more accurate. Embed the text and compare with the possible values.
-    
+
     Attributes:
         model: str = NERIF_DEFAULT_LLM_MODEL
         temperature: float = 0
         debug: bool = False
-        
+
     Methods:
         logits_mode(text: str) -> bool:
             Judge the truthfulness of the statement using logits mode.
@@ -135,7 +197,7 @@ class Nerif:
         instance(text: str, max_retry: int = 3, model: str = NERIF_DEFAULT_LLM_MODEL, debug: bool = False) -> bool:
             Judge the truthfulness of the statement.
     """
-    
+
     def __init__(self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, debug=False):
         self.model = model
         self.prompt = (
@@ -144,22 +206,18 @@ class Nerif:
             "Only answer with 'True' or 'False'."
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(
-            model=model, temperature=temperature
-        )
-        self.logits_agent = LogitsAgent(
-            model=model, temperature=temperature
-        )
-        self.verification = NerifVeification()
+        self.agent = SimpleChatAgent(model=model, temperature=temperature)
+        self.logits_agent = LogitsAgent(model=model, temperature=temperature)
+        self.verification = Nerification()
         self.debug = debug
-        
+
         if self.debug:
             print("Nerif initialized with model:", model, "temperature:", temperature, "debug:", debug)
 
     def logits_mode(self, text: str):
         if self.debug:
             print("Logits mode, text:", text)
-        self.agent.temperature = self.temperature
+        self.logits_agent.temperature = self.temperature
         # replace <question> with the text
         question = "<question>\n" + text + "</question>\n"
         user_prompt = self.prompt.replace("<question>", question)
@@ -167,7 +225,8 @@ class Nerif:
         if self.debug:
             print("Logits mode, response:", response)
         # Fetch the logprobs of the logits
-        # TODO: if LLM don't have logprobs, we need to use another method to get the result
+        if response.choices[0].logprobs is None:
+            raise Exception("Logprobs not found in the response")
         logprobs = response.choices[0].logprobs["content"][0]
         sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
         # Try to find the most likely logprob
@@ -176,12 +235,9 @@ class Nerif:
                 print("Logits mode, sorted_logprobs[index]:", sorted_logprobs[index]["token"])
             simple_fit = self.verification.simple_fit(sorted_logprobs[index]["token"])
             if simple_fit is not None:
-                if simple_fit == "True":
-                    return True
-                else:
-                    return False
+                return simple_fit
         return None
-    
+
     def embedding_mode(self, text: str):
         if self.debug:
             print("Embedding mode, text:", text)
@@ -191,22 +247,13 @@ class Nerif:
         user_prompt = self.prompt.replace("<question>", question)
         response = self.agent.chat(user_prompt, max_tokens=10)
         if self.verification.verify(response):
-            if response == "True":
-                return True
-            else:
-                return False
+            return response
         simple_fit = self.verification.simple_fit(response)
         if simple_fit is not None:
-            if simple_fit == "True":
-                return True
-            else:
-                return False
+            return simple_fit
         force_fit = self.verification.force_fit(response)
-        if force_fit == "True":
-            return True
-        else:
-            return False
-    
+        return force_fit
+
     def judge(self, text, max_retry=3):
         if self.debug:
             print("Judge, text:", text)
@@ -234,7 +281,7 @@ class Nerif:
         # Use embedding mode as fallback
         result = self.embedding_mode(text)
         return result
-    
+
     @classmethod
     def instance(cls, text, max_retry=5, model="gpt-4o", debug=False):
         new_instance = cls(model=model, debug=debug)
@@ -245,67 +292,92 @@ def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, debug=False):
     return Nerif.instance(text, model=model, debug=debug)
 
 
-class NerifMatch:
-    def __init__(self, requirement, choices, model=NERIF_DEFAULT_LLM_MODEL, temperature=0):
-        self.requirement = requirement
+class NerifMatchString:
+    def __init__(self, choices: List[str], model=NERIF_DEFAULT_LLM_MODEL, temperature=0):
         self.choices = choices
         self.model = model
         self.prompt = (
             "Given the following text, determine the best choice to make.\n"
             "If it is hard to make the decision, choose the one you think is the most proper.\n"
-            "<options>"
+            "<options>\n"
         )
         index = 0
         for item in self.choices:
-            index += 1
             self.prompt += f"{index}. {item}\n"
-        self.prompt += "</options>"
+            index += 1
+        self.prompt += "</options>\n"
+        self.prompt += "Now the question is:\n"
+        self.prompt += "<question>\n"
         self.prompt += (
-            "Choose the best choice from the following options.\n"
-            "Only give me the choice ID, only a number"
+            "Choose the best choice from the following options.\n" "Only give me the choice ID, only a number: "
         )
         self.temperature = temperature
         self.agent = SimpleChatAgent(
-            model=model, temperature=temperature, default_prompt=self.prompt
+            model=model,
+            temperature=temperature,
         )
-        self.verification = NerifVeification(
-            possible_value=[str(x) for x in range(1, index + 1)],
-            value_instruction=self.choices
+        self.logits_agent = LogitsAgent(
+            model=model,
+            temperature=temperature,
+        )
+        self.verification = NerificationInt(
+            possible_values=[x for x in range(0, len(choices))],
+        )
+        self.instruction_verification = NerificationString(
+            possible_values=choices,
         )
 
-    def id_to_key(self, index):
-        return list(self.choice.keys())[index - 1]
+    def logits_mode(self, text):
+        self.logits_agent.temperature = self.temperature
+        # replace <question> with the text
+        question = "<question>" + text + "</question>"
+        user_prompt = self.prompt.rsplit("<question>", 1)
+        user_prompt = user_prompt[0] + question + user_prompt[1]
+        response = self.logits_agent.chat(user_prompt, max_tokens=1)
+        # Fetch the logprobs of the logits
+        if response.choices[0].logprobs is None:
+            raise Exception("Logprobs not found in the response")
+        logprobs = response.choices[0].logprobs["content"][0]
+        sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
+        # Try to find the most likely logprob
+        for index in range(len(sorted_logprobs)):
+            simple_fit = self.verification.simple_fit(sorted_logprobs[index]["token"])
+            if simple_fit is not None:
+                return simple_fit
+        return None
 
-    def match(self, text, max_retry=5):
+    def embedding_mode(self, text, max_tokens=300):
         self.agent.temperature = self.temperature
-        user_prompt = (
-            "<question>\n"
-            f"{text}"
-            "</question>\n"
-            "Choose the best route from the following options.\n"
-            "Only give me the choice ID, only a number"
-        )
-        try_id = 0
-        choice = ""
-        while try_id < max_retry:
-            choice = self.agent.chat(user_prompt, max_tokens=50)
-            if self.verification.verify(choice):
-                # pass verification
-                return self.id_to_key(int(choice))
-            self.agent.temperature += 0.1
-            try_id += 1
-        final_prompt = (
+        question = (
             "<question>\n"
             f"{text}"
             "</question>\n"
             "Choose the best route from the following options.\n"
             "Tell me your analysis. Besides ID, I also need your analysis."
         )
-        choice = self.agent.chat(final_prompt, max_tokens=300)
-        choice = self.complex_verification.force_fit(choice)
-        if choice is not None:
-            return self.id_to_key(int(choice))
-        raise Exception("Failed to verify the result in switch.")
+        # replace <question> with the text
+        user_prompt = self.prompt.rsplit("<question>", 1)
+        user_prompt = user_prompt[0] + question + user_prompt[1]
+        response = self.agent.chat(user_prompt, max_tokens=max_tokens)
+        if self.verification.verify(response):
+            return response
+        simple_fit = self.verification.simple_fit(response)
+        if simple_fit is not None:
+            return simple_fit
+        force_fit = self.verification.force_fit(response)
+        return force_fit
+
+    def match(self, text, max_retry=3):
+        self.agent.temperature = self.temperature
+        try_id = 0
+        while try_id < max_retry:
+            result = self.logits_mode(text)
+            try_id += 1
+            if result is not None:
+                return result
+
+        result = self.embedding_mode(text)
+        return result
 
     @classmethod
     def instance(cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL):
@@ -313,5 +385,8 @@ class NerifMatch:
         return new_instance.match(text, max_retry=max_retry)
 
 
-def nerif_match(text, selections, model=NERIF_DEFAULT_LLM_MODEL):
-    return NerifMatch.instance(selections, text, model=model)
+def nerif_match_string(selections, text, model=NERIF_DEFAULT_LLM_MODEL) -> int:
+    return NerifMatchString.instance(selections, text, model=model)
+
+def nerif_match(selections, text, model=NERIF_DEFAULT_LLM_MODEL) -> int:
+    return NerifMatchString.instance(selections, text, model=model)

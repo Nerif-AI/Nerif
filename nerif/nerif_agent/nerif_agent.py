@@ -269,7 +269,6 @@ class SimpleEmbeddingAgent:
             proxy_url = proxy_url[:-1]
         if api_key is None or api_key == "":
             api_key = OPENAI_API_KEY
-        
 
         self.model = model
         self.proxy_url = proxy_url
@@ -300,6 +299,8 @@ class LogitsAgent:
         cost_count (dict): Tracks token usage for input and output.
 
     Methods:
+        chat(message, max_tokens=300, logprobs=True, top_logprobs=5) -> Any:
+            Sends a message and gets a response with logits.
     """
 
     def __init__(
