@@ -74,13 +74,19 @@ class FormatVerifierListInt(FormatVerifierBase):
           return False
       return True
     return False
+  
+  def match(self, val: str) -> list[int]:
+    candidate = self.pattern.findall(val)
+    if len(candidate) > 0:
+      return self.convert(candidate[0])
+    return None
 
   def convert(self, val: str) -> list[int]:
     if self.verify(val):
       val = val[1:-1]
       val = val.split(",")
       return [int(v) for v in val]
-    raise ValueError("Cannot convert to list of int")
+    return None
   
 
 class NerifFormat:
@@ -96,5 +102,5 @@ class NerifFormat:
     Try to convert the value to the given type
     """
     assert verifier is not None, "Verifier is not given"
-    return verifier.convert(val)
+    return verifier(val)
   
