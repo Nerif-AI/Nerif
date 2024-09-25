@@ -225,10 +225,10 @@ class Nerif:
         if self.debug:
             print("Logits mode, response:", response)
         if not(hasattr(response, 'choices') and len(response.choices) > 0):
-            raise AttributeError("'Response' object has no attribute 'choices'")
+            return None
         # if choices doesn't have no logprobs, raise an exception
         if not hasattr(response.choices[0], 'logprobs') or response.choices[0].logprobs is None:
-            raise AttributeError("'Choices' object has no attribute 'logprobs'")
+            return None
         logprobs = response.choices[0].logprobs["content"][0]
         sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
         # Try to find the most likely logprob
@@ -330,8 +330,10 @@ class NerifMatchString:
         user_prompt = user_prompt[0] + question + user_prompt[1]
         response = self.logits_agent.chat(user_prompt, max_tokens=1)
         # Fetch the logprobs of the logits
-        if response.choices[0].logprobs is None:
-            raise Exception("Logprobs not found in the response")
+        if not(hasattr(response, 'choices') and len(response.choices) > 0):
+            return None
+        if not hasattr(response.choices[0], 'logprobs') or response.choices[0].logprobs is None:
+            return None
         logprobs = response.choices[0].logprobs["content"][0]
         sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
         # Try to find the most likely logprob
