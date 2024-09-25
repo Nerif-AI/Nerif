@@ -224,6 +224,8 @@ class Nerif:
         response = self.logits_agent.chat(user_prompt, max_tokens=1)
         if self.debug:
             print("Logits mode, response:", response)
+        if not(hasattr(response, 'choices') and len(response.choices) > 0):
+            raise AttributeError("'Response' object has no attribute 'choices'")
         # if choices doesn't have no logprobs, raise an exception
         if not hasattr(response.choices[0], 'logprobs') or response.choices[0].logprobs is None:
             raise AttributeError("'Choices' object has no attribute 'logprobs'")
@@ -258,15 +260,8 @@ class Nerif:
         if self.debug:
             print("Judge, text:", text)
         self.agent.temperature = self.temperature
-        user_prompt = (
-            f"Now the question is:"
-            f"<question>\n "
-            f"{text}"
-            f"</question>\n"
-            f"True or False? Remeber, only answer with 'True' or 'False'."
-        )
         try_id = 0
-        result = ""
+        result = None
 
         # Try logits mode first
         while try_id < max_retry:
