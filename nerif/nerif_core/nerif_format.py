@@ -28,7 +28,7 @@ class FormatVerifierBase:
 
 class FormatVerifierInt(FormatVerifierBase):
     cls = int
-    pattern = re.compile(r"^\d+$")
+    pattern = re.compile(r"\b\d+\b")
 
     # check if the string is a number
     def verify(self, val: str) -> bool:
@@ -48,7 +48,7 @@ class FormatVerifierInt(FormatVerifierBase):
 
 class FormatVerifierFloat(FormatVerifierBase):
     cls = float
-    pattern = re.compile(r"^\d+(\.\d+)?$")
+    pattern = re.compile(r"\b\d+(\.\d+)?\b")
 
     def verify(self, val: str) -> bool:
         return self.pattern.match(val) is not None
@@ -66,7 +66,7 @@ class FormatVerifierFloat(FormatVerifierBase):
 class FormatVerifierListInt(FormatVerifierBase):
     cls = list[int]
     simple = False
-    pattern = re.compile(r"^\[\d+(,\d+)*\]$")
+    pattern = re.compile(r"\[\s*\d+(?:\s*,\s*\d+)*\s*\]")
 
     def verify(self, val: str) -> bool:
         have_bound = val.startswith("[") and val.endswith("]")
@@ -101,9 +101,10 @@ class NerifFormat:
     def __init__(self):
         pass
 
-    def try_convert(self, val: str, verifier: FormatVerifierBase = None):
+    def try_convert(self, val: str, verifier_cls: FormatVerifierBase = None):
         """
         Try to convert the value to the given type
         """
-        assert verifier is not None, "Verifier is not given"
+        assert verifier_cls is not None, "Verifier is not given"
+        verifier = verifier_cls()
         return verifier(val)
