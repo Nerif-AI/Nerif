@@ -4,6 +4,9 @@ from typing import Any, Dict, List, Optional, Union
 
 from litellm import completion, embedding
 from openai import OpenAI
+import tiktoken
+
+from .nerif_token_counter import NerifTokenCounter
 
 # OpenAI Models
 OPENAI_MODEL: List[str] = [
@@ -35,6 +38,28 @@ OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
 NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
+
+def count_tokens_embedding(model_name, messages: str):
+    encoding = tiktoken.encoding_for_model(model_name=model_name)
+    num_tokens = len(encoding.encode(messages))
+    NerifTokenCounter.count_tokens_embedding(num_tokens)
+
+def count_tokens_request(model_name, messages: List[Dict[str, str]]):
+    tokens_per_message = 3
+    tokens_per_name = 1
+    encoding = tiktoken.encoding_for_model(model_name=model_name)
+    print("{}'s encoder: ".format(model_name), encoding)
+    num_tokens = 0
+    for message in messages:
+        num_tokens += tokens_per_message
+        for key, value in message.items():
+            num_tokens += len(encoding.encode(value))
+            if key == "name":
+                num_tokens += tokens_per_name
+    num_tokens += 3
+    print("Request tokens: ", num_tokens)
+    NerifTokenCounter.count_tokens_request(num_tokens)
+
 def get_litellm_embedding(
     messages: str,
     model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
@@ -46,6 +71,8 @@ def get_litellm_embedding(
             api_key = OPENAI_API_KEY
         if base_url is None or base_url == "":
             base_url = OPENAI_API_BASE
+    
+    count_tokens_embedding(model, messages)
     
     response = embedding(
         model=model,
@@ -92,6 +119,8 @@ def get_litellm_response(
     #     # Current support claude
     #     os.environ["CLAUDE_API_KEY"] = api_key
 
+    count_tokens_request(model, messages)
+
     if logprobs:
         responses = completion(
             model=model,
@@ -111,6 +140,7 @@ def get_litellm_response(
             stream=stream,
         )
 
+    NerifTokenCounter.count_tokens_response(responses.usage.completion_tokens)
     return responses
 
 
