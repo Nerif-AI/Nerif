@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from .nerif_agent import OPENAI_MODEL, OPENAI_EMBEDDING_MODEL
+from .utils import OPENAI_MODEL, OPENAI_EMBEDDING_MODEL
 from typing import List, Dict
 import uuid
 import tiktoken
@@ -79,10 +79,10 @@ class NerifTokenCounter:
     consume = self.model_token.get(k)
     if isinstance(messages, str):
       embedding_tokens = count_tokens_embedding(model_name, messages)
-      self.model_token[k] = NerifTokenConsume(embedding_tokens, 0)
+      self.model_token[k] = NerifTokenConsume(embedding_tokens, 0).append(consume)
     elif isinstance(messages, list):
       request_tokens, response_tokens = count_tokens_request(model_name, messages)
-      self.model_token[k] = NerifTokenConsume(request_tokens, response_tokens)
+      self.model_token[k] = NerifTokenConsume(request_tokens, response_tokens).append(consume)
     else:
       raise ValueError("Invalid message data structure")
 
