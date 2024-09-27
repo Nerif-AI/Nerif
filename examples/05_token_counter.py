@@ -21,9 +21,6 @@ agent_counter.add(agent)
 print(agent_counter.model_token)
 
 print(agent.chat("What is the capital of the moon?", max_tokens=10))
-agent_counter.add(agent)
-print(agent_counter.model_token)
-
 print(agent.chat("What is the top of the earth", max_tokens=10, append=True))
 agent_counter.add(agent)
 print(agent_counter.model_token)
