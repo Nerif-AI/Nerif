@@ -340,5 +340,5 @@ class LogitsAgent:
             )
         else:
             raise ValueError(f"Model {self.model} not supported")
-        self.counter.add_message(self.messages)
+        self.counter.add_message(model_name=self.model, messages=self.messages)
         return result
