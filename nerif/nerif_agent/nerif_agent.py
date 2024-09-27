@@ -247,6 +247,7 @@ class SimpleEmbeddingAgent:
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         model: str = "text-embedding-3-small",
+        counter: NerifTokenCounter = NerifTokenCounter()
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -258,6 +259,7 @@ class SimpleEmbeddingAgent:
         self.model = model
         self.proxy_url = proxy_url
         self.api_key = api_key
+        self.counter = counter
 
     def encode(self, string: str) -> List[float]:
         result = get_litellm_embedding(
@@ -265,7 +267,7 @@ class SimpleEmbeddingAgent:
             model=self.model,
             api_key=self.api_key
         )
-
+        self.counter.add_message(model_name=self.model, messages=string)
         return result.data[0]["embedding"]
 
 
@@ -295,6 +297,7 @@ class LogitsAgent:
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
+        counter: NerifTokenCounter = NerifTokenCounter()
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -313,7 +316,7 @@ class LogitsAgent:
         self.messages: List[Any] = [
             {"role": "system", "content": default_prompt},
         ]
-        self.cost_count = {"input_token_count": 0, "output_token_count": 0}
+        self.counter = counter
 
     def chat(
         self,
@@ -337,5 +340,5 @@ class LogitsAgent:
             )
         else:
             raise ValueError(f"Model {self.model} not supported")
-
+        self.counter.add_message(self.messages)
         return result
