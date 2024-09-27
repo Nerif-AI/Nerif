@@ -59,14 +59,24 @@ class NerifTokenConsume:
     
   def __repr__(self) -> str:
     return "Request: {}, Response: {}, Total: {}".format(self.request, self.response, self.total)
+  
+  def append(self, consume):
+    if consume is None:
+      return self
+    self.request += consume.request
+    self.response += consume.response
+    self.total += consume.total
+    return self
 
 class NerifTokenCounter:
   def __init__(self):
     self.model_token = {} 
 
-  def add_message(self, model_name, messages):
-    counter_id = str(uuid.uuid4())
-    k = (model_name, counter_id)
+  def add_message(self, model_name, messages, chat_id=None):
+    if chat_id is None:
+      chat_id = uuid.uuid4()
+    k = (model_name, chat_id)
+    consume = self.model_token.get(k)
     if isinstance(messages, str):
       embedding_tokens = count_tokens_embedding(model_name, messages)
       self.model_token[k] = NerifTokenConsume(embedding_tokens, 0)
@@ -79,4 +89,5 @@ class NerifTokenCounter:
   def add(self, agent):
     model_name = agent.model
     messages = agent.messages
-    self.add_message(model_name, messages)
+    chat_id = agent.chat_uuid
+    self.add_message(model_name, messages, chat_id=chat_id)

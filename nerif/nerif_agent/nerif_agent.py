@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from typing import Any, Dict, List, Optional, Union
 
 from litellm import completion, embedding
@@ -210,6 +211,7 @@ class SimpleChatAgent:
             {"role": "system", "content": default_prompt},
         ]
         self.cost_count = {"input_token_count": 0, "output_token_count": 0}
+        self.chat_uuid = ""
 
     def reset(self, prompt: Optional[str] = None) -> None:
         # Reset the conversation history
@@ -217,10 +219,11 @@ class SimpleChatAgent:
             prompt = self.default_prompt
 
         self.messages: List[Any] = [{"role": "system", "content": prompt}]
+        self.chat_uuid = str(uuid.uuid4())
 
     def chat(self, message: str, append: bool = False, max_tokens: int = 300) -> str:
         # Append the user's message to the conversation history
-        if not append:
+        if not append or self.chat_uuid == "":
             self.reset()
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
