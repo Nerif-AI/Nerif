@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Any, Dict, List, Optional, Union
+import logging
 
 from litellm import completion, embedding
 from openai import OpenAI
@@ -38,6 +39,7 @@ OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
 NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
+LOGGER = logging.getLogger("Nerif")
 
 def count_tokens_embedding(model_name, messages: str):
     encoding = tiktoken.encoding_for_model(model_name=model_name)
@@ -48,7 +50,7 @@ def count_tokens_request(model_name, messages: List[Dict[str, str]]):
     tokens_per_message = 3
     tokens_per_name = 1
     encoding = tiktoken.encoding_for_model(model_name=model_name)
-    print("{}'s encoder: ".format(model_name), encoding)
+    LOGGER.debug(f"{model_name} 's encoder: {encoding}")
     num_tokens = 0
     for message in messages:
         num_tokens += tokens_per_message
@@ -57,7 +59,7 @@ def count_tokens_request(model_name, messages: List[Dict[str, str]]):
             if key == "name":
                 num_tokens += tokens_per_name
     num_tokens += 3
-    print("Request tokens: ", num_tokens)
+    LOGGER.debug(f"Request tokens: {num_tokens}")
     NerifTokenCounter.count_tokens_request(num_tokens)
 
 def get_litellm_embedding(
