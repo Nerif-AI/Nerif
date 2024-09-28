@@ -7,3 +7,4 @@ from .nerif_format import (
     FormatVerifierHumanReadableList,
     NerifFormat
 )
+from .log import set_up_logging
