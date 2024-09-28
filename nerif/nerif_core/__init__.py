@@ -6,3 +6,4 @@ from .nerif_format import (
     FormatVerifierListInt,
     NerifFormat
 )
+from .log import set_up_logging
