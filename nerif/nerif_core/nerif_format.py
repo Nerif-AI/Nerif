@@ -48,7 +48,7 @@ class FormatVerifierInt(FormatVerifierBase):
 
 class FormatVerifierFloat(FormatVerifierBase):
     cls = float
-    pattern = re.compile(r"\b\d+(\.\d+)?\b")
+    pattern = re.compile(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?")
 
     def verify(self, val: str) -> bool:
         return self.pattern.match(val) is not None
@@ -56,6 +56,7 @@ class FormatVerifierFloat(FormatVerifierBase):
     def match(self, val: str) -> any:
         candidate = self.pattern.findall(val)
         if len(candidate) > 0:
+            print(candidate)
             return float(candidate[0])
         return None
 
@@ -92,7 +93,26 @@ class FormatVerifierListInt(FormatVerifierBase):
             return [int(v) for v in val]
         return None
 
-
+class FormatVerifierHumanReadableList(FormatVerifierBase):
+    cls = list[str]
+    simple = False
+    pattern = re.compile(r'^\s*\d+\.\s+.*?(?=\n\s*\d+\.|\Z)',
+                     re.MULTILINE | re.DOTALL)
+    
+    def verify(self, val: str) -> bool:
+        return False # Force verifier to use match method
+    
+    def match(self, val: str) -> list[str]:
+        matches = self.pattern.findall(val)
+        matches = [match.strip() for match in matches]
+        matches = [match.split('. ')[1].strip() for match in matches]
+        if len(matches) > 0:
+            return matches
+        return None
+    
+    def convert (self, val: str) -> list[str]:
+        return self.match(val)
+    
 class NerifFormat:
     """
     Convert llm response to given type
