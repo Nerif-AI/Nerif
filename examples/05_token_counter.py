@@ -23,3 +23,7 @@ print(agent1.chat("What is the capital of the moon?", max_tokens=10))
 agent2 = SimpleChatAgent(counter=external_counter)
 print(agent2.chat("What is the top of the earth", max_tokens=10, append=True))
 print(external_counter.model_token)
+
+external_counter = NerifTokenCounter()
+judge = nerif("the sky is blue", counter=external_counter)
+print(external_counter.model_token)
