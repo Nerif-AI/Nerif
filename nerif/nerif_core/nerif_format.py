@@ -49,14 +49,13 @@ class FormatVerifierInt(FormatVerifierBase):
 class FormatVerifierFloat(FormatVerifierBase):
     cls = float
     pattern = re.compile(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?")
-
+    
     def verify(self, val: str) -> bool:
         return self.pattern.match(val) is not None
 
     def match(self, val: str) -> any:
         candidate = self.pattern.findall(val)
         if len(candidate) > 0:
-            print(candidate)
             return float(candidate[0])
         return None
 
