@@ -248,21 +248,22 @@ class SimpleChatAgent:
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
 
+        kwargs = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_tokens": max_tokens,
+        }
+
         if self.model.startswith("ollama"):
             model_name = self.model.split("/")[1]
-            result = get_ollama_response(
-                self.messages,
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=max_tokens,
-            )
+
+            LOGGER.debug("requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>", self.messages, kwargs)
+            result = get_ollama_response(self.messages, **kwargs)
+
         elif self.model in OPENAI_MODEL:
-            result = get_litellm_response(
-                self.messages,
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=max_tokens,
-            )
+            LOGGER.debug("requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>", self.messages, kwargs)
+            result = get_litellm_response(self.messages, **kwargs)
+            
         else:
             raise ValueError(f"Model {self.model} not supported")
 
