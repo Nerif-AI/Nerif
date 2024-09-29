@@ -4,5 +4,6 @@ from .nerif_format import (
     FormatVerifierFloat,
     FormatVerifierInt,
     FormatVerifierListInt,
+    FormatVerifierHumanReadableList,
     NerifFormat
 )
