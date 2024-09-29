@@ -340,5 +340,8 @@ class LogitsAgent:
             )
         else:
             raise ValueError(f"Model {self.model} not supported")
+        
+        text_result = result.choices[0].message.content
+        self.messages.append({"role": "system", "content": text_result})
         self.counter.add_message(model_name=self.model, messages=self.messages)
         return result
