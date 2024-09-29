@@ -1,5 +1,5 @@
 from nerif.nerif_core import NerifFormat
-from nerif.nerif_core import FormatVerifierFloat, FormatVerifierInt, FormatVerifierListInt
+from nerif.nerif_core import FormatVerifierFloat, FormatVerifierInt, FormatVerifierListInt, FormatVerifierHumanReadableList
 
 dummy_response1 = "1"
 dummy_response2 = "The result is: 1"
@@ -34,6 +34,19 @@ try:
     result8 = formatter.try_convert(failed_response2, FormatVerifierFloat)
 except ValueError as e:
     print("We cannot convert the response \"{}\" to float".format(failed_response2))
+
+human_readable_list = """
+Here are some fluits:
+    1. Apple
+    2. Banana
+    3. Cherry
+    4. Durian
+5. Elderberry
+6.     Fig
+"""
+result_list = formatter.try_convert(human_readable_list, FormatVerifierHumanReadableList)
+print(result_list)
+
     
 #################### Be aware the following condition may incur an error without exception ####################
 warning_response = "The result is: 114514.1919810"
