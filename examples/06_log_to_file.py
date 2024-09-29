@@ -2,7 +2,7 @@ import logging
 import nerif
 
 
-nerif.set_up_logging(std=True)
+nerif.set_up_logging(out_file="sample.log", std=True)
 
 agent = nerif.nerif_agent.SimpleChatAgent()
 
