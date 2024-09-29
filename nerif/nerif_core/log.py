@@ -59,6 +59,8 @@ class NerifFormatter(logging.Formatter):
         return NerifFormatter.prettify_dict(s)
 
     # FIXME the classname is actually not dict, refactor it later
+    # FIXME the coloring of vscode is broken, refactor it so the syntax coloring is working
+    # my god what have I wrote
     @staticmethod
     def prettify_dict(d, indented=2):
         if type(d) == dict:
