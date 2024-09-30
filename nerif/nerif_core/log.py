@@ -54,23 +54,34 @@ class NerifFormatter(logging.Formatter):
     
     @staticmethod
     def evaller(d):
-        # FIXME only able to take the first item
-        s = ast.literal_eval(d.group(1))
-        return NerifFormatter.prettify_dict(s)
+        try:
+            s = ast.literal_eval(d.group(1))
+            return NerifFormatter.prettify(s)
+        except ValueError:
+            return f"\n{d.group(1)}\n(parsing error happened)\n"
 
-    # FIXME the classname is actually not dict, refactor it later
-    # FIXME the coloring of vscode is broken, refactor it so the syntax coloring is working
-    # my god what have I wrote
+
     @staticmethod
-    def prettify_dict(d, indented=2):
+    def prettify(d, indented=2):
+        rec = NerifFormatter.prettify
         if type(d) == dict:
-            item = [f"{INDENT * indented}{k}: {NerifFormatter.prettify_dict(v, indented + 1)}" for k,v in d.items()]
-            item.append(f"{INDENT * (indented - 1)}}}")
-            item = "\n".join(item)
-            return f"{{\n{item}"
+            item = [
+                f"{rec(k)}: {rec(v, indented + 1)},"
+                for k,v in d.items()
+            ]
+            item.insert(0, "{")
+            item_string = f"\n{INDENT * indented}".join(item)
+            unindented  = INDENT * (indented - 1)
+            return "%s\n%s}" % (item_string, unindented)
+        
         if type(d) == list:
-            item = [f"{INDENT * indented}{NerifFormatter.prettify_dict(k, indented + 1)}" for k in d]
-            item.append(f"{INDENT * (indented - 1)}]")
-            item = "\n".join(item)
-            return f"[\n{item}"
+            item = [f"{rec(k, indented + 1)}," for k in d]
+            item.insert(0, "[")
+            item_string = f"\n{INDENT * indented}".join(item)
+            unindented  = INDENT * (indented - 1)
+            return "%s\n%s]" % (item_string, unindented)
+
+        if type(d) == str:
+            return f"\"{d}\""
+        
         return str(d)
