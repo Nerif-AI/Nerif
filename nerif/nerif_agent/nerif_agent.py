@@ -255,6 +255,7 @@ class SimpleChatAgent:
         }
 
         if self.model.startswith("ollama"):
+            # ??? why is here a model_name never used
             model_name = self.model.split("/")[1]
 
             LOGGER.debug("requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>", self.messages, kwargs)
