@@ -114,7 +114,7 @@ def count_tokens_request(model_name, messages: List[Dict[str, str]]):
 
 class NerifTokenConsume:
   """
-  Data struct for storing token consumption
+  Data structure for storing token consumption
   members:
   - request: int - number of tokens for request
   - response: int - number of tokens for response
@@ -122,7 +122,7 @@ class NerifTokenConsume:
   """
   def __init__(self, request, response):
     """
-    Constructor for NerifTokenConsume
+    Data structure for storing token consumption
     
     paramaters:
     - request: int - number of tokens for request
@@ -168,7 +168,7 @@ class NerifTokenCounter:
   """
   def __init__(self):
     """
-    Constructor for NerifTokenCounter
+    Class for counting tokens consumed by the model
     """
     self.model_token = {} 
 
