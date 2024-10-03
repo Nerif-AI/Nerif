@@ -44,7 +44,7 @@ def timestamp_filename(filename, t_string):
         return filename + t_string
     
     p_ext = filename.rindex('.')
-    return f"{filename[:p_ext]} {t_string}{filename[p_ext:]}"
+    return f"{filename[:p_ext]}{t_string}{filename[p_ext:]}"
 
 # FIXME the name of formatter collide with nerif format, rethink a name
 class NerifFormatter(logging.Formatter):
