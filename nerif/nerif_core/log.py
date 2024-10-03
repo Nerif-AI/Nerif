@@ -23,9 +23,8 @@ def set_up_logging(
 
     if out_file != None:
         if time_stamp:
-            p_ext = out_file.rindex('.')
-            t_string = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-            out_file = f"{out_file[:p_ext]} {t_string}{out_file[p_ext:]}"
+            t_string = datetime.now().strftime(" %Y-%m-%d %H-%M-%S")
+            out_file = timestamp_filename(out_file, t_string)
 
         file_handler = logging.FileHandler(out_file, mode=mode)
         file_handler.setFormatter(basic_formatting)
@@ -39,6 +38,13 @@ def set_up_logging(
     if std or out_file != None:
         logger.info("-" * 20)
         logger.info("logging enabled")
+
+def timestamp_filename(filename, t_string):
+    if '.' not in filename:
+        return filename + t_string
+    
+    p_ext = filename.rindex('.')
+    return f"{filename[:p_ext]} {t_string}{filename[p_ext:]}"
 
 # FIXME the name of formatter collide with nerif format, rethink a name
 class NerifFormatter(logging.Formatter):
