@@ -2,13 +2,14 @@ import logging
 import sys
 import re
 from typing import Literal
-# import json
+from datetime import datetime
 import ast
 
 INDENT = "\t"
 
 def set_up_logging(
     out_file: None | str = None,
+    time_stamp: bool = True,
     mode: Literal["a", "w"] = "a",
     fmt: str = "%(levelname)s\t%(name)s\t%(asctime)s\t%(message)s",
     std: bool = False,
@@ -21,6 +22,11 @@ def set_up_logging(
     basic_formatting = NerifFormatter(fmt)
 
     if out_file != None:
+        if time_stamp:
+            p_ext = out_file.rindex('.')
+            t_string = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+            out_file = f"{out_file[:p_ext]} {t_string}{out_file[p_ext:]}"
+
         file_handler = logging.FileHandler(out_file, mode=mode)
         file_handler.setFormatter(basic_formatting)
         logger.addHandler(file_handler)
