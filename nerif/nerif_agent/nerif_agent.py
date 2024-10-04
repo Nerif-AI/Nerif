@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 from typing import Any, Dict, List, Optional, Union
+import logging
 
 from litellm import completion, embedding
 from openai import OpenAI
@@ -10,6 +11,58 @@ import tiktoken
 from .utils import *
 from .nerif_token_counter import NerifTokenCounter
 
+# OpenAI Models
+OPENAI_MODEL: List[str] = [
+    "gpt-3.5-turbo",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4o-2024-05-13",
+    "gpt-4o-2024-05-13-preview",
+    "gpt-4o-2024-08-06",
+    "gpt-4o-2024-08-06-preview",
+    "gpt-4o-2024-09-13",
+    "gpt-4o-2024-09-13-preview",
+    "gpt-4-turbo",
+    "gpt-4-turbo-preview",
+    "gpt-4",
+    "gpt-4-preview",
+    "gpt-4-turbo-2024-04-09",
+    "gpt-4-turbo-2024-04-09-preview",
+]
+OPENAI_EMBEDDING_MODEL: List[str] = [
+    "text-embedding-3-small",
+    "text-embedding-3-large",
+    "text-embedding-ada-002",
+]
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
+OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
+NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
+
+LOGGER = logging.getLogger("Nerif")
+
+def count_tokens_embedding(model_name, messages: str):
+    encoding = tiktoken.encoding_for_model(model_name=model_name)
+    num_tokens = len(encoding.encode(messages))
+    NerifTokenCounter.count_tokens_embedding(num_tokens)
+
+def count_tokens_request(model_name, messages: List[Dict[str, str]]):
+    tokens_per_message = 3
+    tokens_per_name = 1
+    encoding = tiktoken.encoding_for_model(model_name=model_name)
+    LOGGER.debug(f"{model_name} 's encoder: {encoding}")
+    num_tokens = 0
+    for message in messages:
+        num_tokens += tokens_per_message
+        for key, value in message.items():
+            num_tokens += len(encoding.encode(value))
+            if key == "name":
+                num_tokens += tokens_per_name
+    num_tokens += 3
+    LOGGER.debug(f"Request tokens: {num_tokens}")
+    NerifTokenCounter.count_tokens_request(num_tokens)
 
 def get_litellm_embedding(
     messages: str,
@@ -203,21 +256,23 @@ class SimpleChatAgent:
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
 
+        kwargs = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_tokens": max_tokens,
+        }
+
         if self.model.startswith("ollama"):
+            # ??? why is here a model_name never used
             model_name = self.model.split("/")[1]
-            result = get_ollama_response(
-                self.messages,
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=max_tokens,
-            )
+
+            LOGGER.debug("requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>", self.messages, kwargs)
+            result = get_ollama_response(self.messages, **kwargs)
+
         elif self.model in OPENAI_MODEL:
-            result = get_litellm_response(
-                self.messages,
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=max_tokens,
-            )
+            LOGGER.debug("requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>", self.messages, kwargs)
+            result = get_litellm_response(self.messages, **kwargs)
+            
         else:
             raise ValueError(f"Model {self.model} not supported")
 
