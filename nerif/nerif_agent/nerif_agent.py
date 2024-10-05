@@ -4,14 +4,10 @@ import logging
 import os
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Union
-import logging
 
 import litellm
 import tiktoken
 from openai import OpenAI
-import tiktoken
-
-from .nerif_token_counter import NerifTokenCounter
 
 from .nerif_token_counter import NerifTokenCounter
 
