@@ -4,10 +4,14 @@ import logging
 import os
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Union
+import logging
 
 import litellm
 import tiktoken
 from openai import OpenAI
+import tiktoken
+
+from .nerif_token_counter import NerifTokenCounter
 
 from .nerif_token_counter import NerifTokenCounter
 
@@ -283,6 +287,12 @@ class SimpleChatAgent:
         # Append the user's message to the conversation history
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
+
+        kwargs = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_tokens": max_tokens,
+        }
 
         kwargs = {
             "model": self.model,

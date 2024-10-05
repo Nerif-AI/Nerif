@@ -1,5 +1,5 @@
-from nerif.nerif_agent import SimpleChatAgent
 from nerif.nerif_core import nerif_match_string
+from nerif.nerif_agent import SimpleChatAgent
 
 selections = [
   "iPhone 5",
