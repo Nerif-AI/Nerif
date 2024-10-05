@@ -32,13 +32,13 @@ failed_response1 = "There is no available result"
 try:
     result7 = formatter.try_convert(failed_response1, FormatVerifierInt)
 except ValueError as e:
-    print("We cannot convert the response \"{}\" to int".format(failed_response1))
-    
+    print('We cannot convert the response "{}" to int'.format(failed_response1))
+
 failed_response2 = "The result is: 114514"
 try:
     result8 = formatter.try_convert(failed_response2, FormatVerifierFloat)
 except ValueError as e:
-    print("We cannot convert the response \"{}\" to float".format(failed_response2))
+    print('We cannot convert the response "{}" to float'.format(failed_response2))
 
 human_readable_list = """
 Here are some fluits:
@@ -49,10 +49,12 @@ Here are some fluits:
 5. Elderberry
 6.     Fig
 """
-result_list = formatter.try_convert(human_readable_list, FormatVerifierHumanReadableList)
+result_list = formatter.try_convert(
+    human_readable_list, FormatVerifierHumanReadableList
+)
 print(result_list)
 
-    
+
 #################### Be aware the following condition may incur an error without exception ####################
 warning_response = "The result is: 114514.1919810"
 result8 = formatter.try_convert(warning_response, FormatVerifierInt)

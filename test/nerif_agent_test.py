@@ -43,7 +43,7 @@ class TestNerifAgent(unittest.TestCase):
         result = logits_agent.chat("Hello, how are you?", max_tokens=1)
         print(result)
         self.assertIsNotNone(result)
-    
+
     def test_ollama_agent(self):
         ollama_agent = SimpleChatAgent(model="ollama/llama3.1")
         result = ollama_agent.chat("Hello, how are you?")

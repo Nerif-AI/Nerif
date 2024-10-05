@@ -65,8 +65,12 @@ class TestNerifFormat(unittest.TestCase):
         6.     Fig
         """
         formatter = NerifFormat()
-        result_list = formatter.try_convert(human_readable_list, FormatVerifierHumanReadableList)
-        self.assertEqual(result_list, ["Apple", "Banana", "Cherry", "Durian", "Elderberry", "Fig"])
+        result_list = formatter.try_convert(
+            human_readable_list, FormatVerifierHumanReadableList
+        )
+        self.assertEqual(
+            result_list, ["Apple", "Banana", "Cherry", "Durian", "Elderberry", "Fig"]
+        )
 
         failed_response1 = "There is no available result"
         with self.assertRaises(ValueError):

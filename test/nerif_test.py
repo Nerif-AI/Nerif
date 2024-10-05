@@ -2,7 +2,7 @@ import os
 import sys
 import unittest
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from nerif.nerif_core import *
 
@@ -28,10 +28,12 @@ class MyTestCase(unittest.TestCase):
             "adduser": "add a new user on my server",
             "reservation": "make a reservation for the server",
         }
-        match_result = nerif_match("I wanna use the server for AI training tonight", test_selection)
+        match_result = nerif_match(
+            "I wanna use the server for AI training tonight", test_selection
+        )
 
         self.assertEqual("reservation", match_result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
