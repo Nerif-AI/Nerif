@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 
+
 class APIStore:
   api_key: str = None
   base_url: str = None

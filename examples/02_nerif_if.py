@@ -1,5 +1,5 @@
-from nerif.nerif_core import nerif
 from nerif.nerif_agent import SimpleChatAgent
+from nerif.nerif_core import nerif
 
 agent = SimpleChatAgent()
 

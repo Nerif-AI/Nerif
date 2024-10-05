@@ -1,5 +1,10 @@
-from nerif.nerif_core import NerifFormat
-from nerif.nerif_core import FormatVerifierFloat, FormatVerifierInt, FormatVerifierListInt, FormatVerifierHumanReadableList
+from nerif.nerif_core import (
+    FormatVerifierFloat,
+    FormatVerifierHumanReadableList,
+    FormatVerifierInt,
+    FormatVerifierListInt,
+    NerifFormat,
+)
 
 dummy_response1 = "1"
 dummy_response2 = "The result is: 1"
