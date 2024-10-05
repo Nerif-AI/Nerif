@@ -1,6 +1,5 @@
 import json
 import os
-import uuid
 from typing import Any, Dict, List, Optional, Union
 import logging
 
@@ -8,7 +7,6 @@ from litellm import completion, embedding
 from openai import OpenAI
 import tiktoken
 
-from .utils import *
 from .nerif_token_counter import NerifTokenCounter
 
 # OpenAI Models
@@ -76,7 +74,7 @@ def get_litellm_embedding(
         if base_url is None or base_url == "":
             base_url = OPENAI_API_BASE
     
-    # count_tokens_embedding(model, messages)
+    count_tokens_embedding(model, messages)
     
     response = embedding(
         model=model,
@@ -123,7 +121,7 @@ def get_litellm_response(
     #     # Current support claude
     #     os.environ["CLAUDE_API_KEY"] = api_key
 
-    # count_tokens_request(model, messages)
+    count_tokens_request(model, messages)
 
     if logprobs:
         responses = completion(
@@ -144,7 +142,7 @@ def get_litellm_response(
             stream=stream,
         )
 
-    # NerifTokenCounter.count_tokens_response(responses.usage.completion_tokens)
+    NerifTokenCounter.count_tokens_response(responses.usage.completion_tokens)
     return responses
 
 
@@ -216,7 +214,6 @@ class SimpleChatAgent:
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
-        counter: NerifTokenCounter = NerifTokenCounter()
     ):
         # Set the proxy URL and API key
         if proxy_url is None or proxy_url == "":
@@ -238,8 +235,6 @@ class SimpleChatAgent:
             {"role": "system", "content": default_prompt},
         ]
         self.cost_count = {"input_token_count": 0, "output_token_count": 0}
-        self.chat_uuid = ""
-        self.counter = counter
 
     def reset(self, prompt: Optional[str] = None) -> None:
         # Reset the conversation history
@@ -247,12 +242,9 @@ class SimpleChatAgent:
             prompt = self.default_prompt
 
         self.messages: List[Any] = [{"role": "system", "content": prompt}]
-        self.chat_uuid = str(uuid.uuid4())
 
     def chat(self, message: str, append: bool = False, max_tokens: int = 300) -> str:
         # Append the user's message to the conversation history
-        if not append or self.chat_uuid == "":
-            self.reset()
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
 
@@ -277,8 +269,10 @@ class SimpleChatAgent:
             raise ValueError(f"Model {self.model} not supported")
 
         text_result = result.choices[0].message.content
-        self.messages.append({"role": "system", "content": text_result})
-        self.counter.add_message(model_name=self.model, messages=self.messages, chat_id=self.chat_uuid)
+        if append:
+            self.messages.append({"role": "system", "content": text_result})
+        else:
+            self.reset()
         return text_result
 
 
@@ -302,7 +296,6 @@ class SimpleEmbeddingAgent:
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         model: str = "text-embedding-3-small",
-        counter: NerifTokenCounter = NerifTokenCounter()
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -314,7 +307,6 @@ class SimpleEmbeddingAgent:
         self.model = model
         self.proxy_url = proxy_url
         self.api_key = api_key
-        self.counter = counter
 
     def encode(self, string: str) -> List[float]:
         result = get_litellm_embedding(
@@ -322,7 +314,7 @@ class SimpleEmbeddingAgent:
             model=self.model,
             api_key=self.api_key
         )
-        self.counter.add_message(model_name=self.model, messages=string)
+
         return result.data[0]["embedding"]
 
 
@@ -352,7 +344,6 @@ class LogitsAgent:
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
-        counter: NerifTokenCounter = NerifTokenCounter()
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -371,7 +362,7 @@ class LogitsAgent:
         self.messages: List[Any] = [
             {"role": "system", "content": default_prompt},
         ]
-        self.counter = counter
+        self.cost_count = {"input_token_count": 0, "output_token_count": 0}
 
     def chat(
         self,
@@ -395,8 +386,5 @@ class LogitsAgent:
             )
         else:
             raise ValueError(f"Model {self.model} not supported")
-        
-        text_result = result.choices[0].message.content
-        self.messages.append({"role": "system", "content": text_result})
-        self.counter.add_message(model_name=self.model, messages=self.messages)
+
         return result
