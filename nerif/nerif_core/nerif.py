@@ -8,7 +8,6 @@ from nerif.nerif_agent.nerif_agent import (
     LogitsAgent,
     SimpleChatAgent,
     SimpleEmbeddingAgent,
-    NerifTokenCounter
 )
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -199,7 +198,7 @@ class Nerif:
             Judge the truthfulness of the statement.
     """
 
-    def __init__(self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, debug=False, counter=NerifTokenCounter()):
+    def __init__(self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, debug=False):
         self.model = model
         self.prompt = (
             "Given the following text, determine if the statement is true or false.\n"
@@ -207,9 +206,8 @@ class Nerif:
             "Only answer with 'True' or 'False'."
         )
         self.temperature = temperature
-        self.counter = counter
-        self.agent = SimpleChatAgent(model=model, temperature=temperature, counter=counter)
-        self.logits_agent = LogitsAgent(model=model, temperature=temperature, counter=counter)
+        self.agent = SimpleChatAgent(model=model, temperature=temperature)
+        self.logits_agent = LogitsAgent(model=model, temperature=temperature)
         self.verification = Nerification()
         self.debug = debug
 
@@ -280,17 +278,17 @@ class Nerif:
         return result
 
     @classmethod
-    def instance(cls, text, max_retry=5, model="gpt-4o", debug=False, counter=NerifTokenCounter()):
-        new_instance = cls(model=model, debug=debug, counter=counter)
+    def instance(cls, text, max_retry=5, model="gpt-4o", debug=False):
+        new_instance = cls(model=model, debug=debug)
         return new_instance.judge(text, max_retry=max_retry)
 
 
-def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, debug=False, counter=NerifTokenCounter()):
-    return Nerif.instance(text, model=model, debug=debug, counter=counter)
+def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, debug=False):
+    return Nerif.instance(text, model=model, debug=debug)
 
 
 class NerifMatchString:
-    def __init__(self, choices: List[str], model=NERIF_DEFAULT_LLM_MODEL, temperature=0, counter=NerifTokenCounter()):
+    def __init__(self, choices: List[str], model=NERIF_DEFAULT_LLM_MODEL, temperature=0):
         self.choices = choices
         self.model = model
         self.prompt = (
@@ -309,16 +307,13 @@ class NerifMatchString:
             "Choose the best choice from the following options.\n" "Only give me the choice ID, only a number: "
         )
         self.temperature = temperature
-        self.counter = counter
         self.agent = SimpleChatAgent(
             model=model,
             temperature=temperature,
-            counter=counter
         )
         self.logits_agent = LogitsAgent(
             model=model,
             temperature=temperature,
-            counter=counter
         )
         self.verification = NerificationInt(
             possible_values=[x for x in range(0, len(choices))],
@@ -382,13 +377,13 @@ class NerifMatchString:
         return result
 
     @classmethod
-    def instance(cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL, counter=NerifTokenCounter()):
-        new_instance = cls(selections, model=model, counter=counter)
+    def instance(cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL):
+        new_instance = cls(selections, model=model)
         return new_instance.match(text, max_retry=max_retry)
 
 
-def nerif_match_string(selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=NerifTokenCounter()) -> int:
-    return NerifMatchString.instance(selections, text, model=model, counter=counter)
+def nerif_match_string(selections, text, model=NERIF_DEFAULT_LLM_MODEL) -> int:
+    return NerifMatchString.instance(selections, text, model=model)
 
-def nerif_match(selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=NerifTokenCounter()) -> int:
-    return NerifMatchString.instance(selections, text, model=model, counter=NerifTokenCounter())
+def nerif_match(selections, text, model=NERIF_DEFAULT_LLM_MODEL) -> int:
+    return NerifMatchString.instance(selections, text, model=model)
