@@ -5,10 +5,7 @@ import warnings
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from nerif.agent.agent import (
-    LogitsAgent,
-    SimpleChatAgent,
-)
+from nerif.agent import LogitsAgent, SimpleChatAgent
 
 
 class TestNerifAgent(unittest.TestCase):
