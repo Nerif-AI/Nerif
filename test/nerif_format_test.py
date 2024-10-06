@@ -13,6 +13,7 @@ from nerif.core import (
     NerifFormat,
 )
 
+
 class TestNerifFormat(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
