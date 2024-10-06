@@ -3,7 +3,7 @@ from typing import Any, List, Optional
 
 import numpy as np
 
-from nerif.nerif_agent.nerif_agent import (
+from nerif.agent.agent import (
     LogitsAgent,
     SimpleChatAgent,
     SimpleEmbeddingAgent,

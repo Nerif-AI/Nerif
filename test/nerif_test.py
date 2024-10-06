@@ -4,13 +4,13 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from nerif.nerif_core import nerif, nerif_match
+from nerif.core import core, nerif_match
 
 class MyTestCase(unittest.TestCase):
     def test_judge(self):
-        judge = nerif("the sky is blue")
+        judge = core("the sky is blue")
         self.assertEqual(True, judge)  # add assertion here
-        judge = nerif("Do you know who I am?")
+        judge = core("Do you know who I am?")
         self.assertEqual(False, judge)
 
     def test_match(self):

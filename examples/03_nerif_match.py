@@ -1,4 +1,4 @@
-from nerif.nerif_core import nerif_match_string
+from nerif.core import nerif_match_string
 
 selections = ["iPhone 5", "iPhone 6", "iPhone 12"]
 

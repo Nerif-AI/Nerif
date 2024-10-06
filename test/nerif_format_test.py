@@ -1,7 +1,7 @@
 import unittest
 import warnings
 
-from nerif.nerif_core import (
+from nerif.core import (
     FormatVerifierFloat,
     FormatVerifierHumanReadableList,
     FormatVerifierInt,

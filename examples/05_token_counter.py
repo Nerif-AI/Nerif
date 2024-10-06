@@ -1,7 +1,7 @@
-from nerif.nerif_agent import NerifTokenCounter
-from nerif.nerif_core import nerif
+from nerif.agent import NerifTokenCounter
+from nerif.core import core
 
-if nerif("the sky is blue"):
+if core("the sky is blue"):
     print("True")
 
 print(NerifTokenCounter.get_tokens())
