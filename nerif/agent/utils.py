@@ -1,5 +1,5 @@
-from typing import List
 import os
+from typing import List
 
 # OpenAI Models
 OPENAI_MODEL: List[str] = [

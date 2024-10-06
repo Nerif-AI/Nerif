@@ -1,4 +1,4 @@
-from nerif.agent import VisionAgent, MessageType
+from nerif.agent import MessageType, VisionAgent
 
 if __name__ == "__main__":
     vision_model = VisionAgent(model="openrouter/openai/gpt-4o-2024-08-06")

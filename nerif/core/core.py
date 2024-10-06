@@ -3,19 +3,13 @@ from typing import Any, List, Optional
 
 import numpy as np
 
-from nerif.agent.agent import (
-    LogitsAgent,
-    SimpleChatAgent,
-    SimpleEmbeddingAgent,
-)
+from nerif.agent.agent import LogitsAgent, SimpleChatAgent, SimpleEmbeddingAgent
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
 OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
-NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get(
-    "NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small"
-)
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
 
 def similarity_dist(vec1, vec2, func="cosine"):
@@ -247,15 +241,10 @@ class Nerif:
         if not (hasattr(response, "choices") and len(response.choices) > 0):
             return None
         # if choices doesn't have no logprobs, raise an exception
-        if (
-            not hasattr(response.choices[0], "logprobs")
-            or response.choices[0].logprobs is None
-        ):
+        if not hasattr(response.choices[0], "logprobs") or response.choices[0].logprobs is None:
             return None
         logprobs = response.choices[0].logprobs["content"][0]
-        sorted_logprobs = sorted(
-            logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True
-        )
+        sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
         # Try to find the most likely logprob
         for index in range(len(sorted_logprobs)):
             if self.debug:
@@ -316,9 +305,7 @@ def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, debug=False):
 
 
 class NerifMatchString:
-    def __init__(
-        self, choices: List[str], model=NERIF_DEFAULT_LLM_MODEL, temperature=0
-    ):
+    def __init__(self, choices: List[str], model=NERIF_DEFAULT_LLM_MODEL, temperature=0):
         self.choices = choices
         self.model = model
         self.prompt = (
@@ -334,8 +321,7 @@ class NerifMatchString:
         self.prompt += "Now the question is:\n"
         self.prompt += "<question>\n"
         self.prompt += (
-            "Choose the best choice from the following options.\n"
-            "Only give me the choice ID, only a number: "
+            "Choose the best choice from the following options.\n" "Only give me the choice ID, only a number: "
         )
         self.temperature = temperature
         self.agent = SimpleChatAgent(
@@ -363,15 +349,10 @@ class NerifMatchString:
         # Fetch the logprobs of the logits
         if not (hasattr(response, "choices") and len(response.choices) > 0):
             return None
-        if (
-            not hasattr(response.choices[0], "logprobs")
-            or response.choices[0].logprobs is None
-        ):
+        if not hasattr(response.choices[0], "logprobs") or response.choices[0].logprobs is None:
             return None
         logprobs = response.choices[0].logprobs["content"][0]
-        sorted_logprobs = sorted(
-            logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True
-        )
+        sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
         # Try to find the most likely logprob
         for index in range(len(sorted_logprobs)):
             simple_fit = self.verification.simple_fit(sorted_logprobs[index]["token"])

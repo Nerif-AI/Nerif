@@ -42,9 +42,7 @@ OR_SITE_URL = os.environ.get("OR_SITE_URL")
 OR_APP_NAME = os.environ.get("OR_APP_NAME")
 
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
-NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get(
-    "NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small"
-)
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
 LOGGER = logging.getLogger("Nerif")
 
@@ -366,9 +364,7 @@ class SimpleEmbeddingAgent:
         self.api_key = api_key
 
     def encode(self, string: str) -> List[float]:
-        result = get_litellm_embedding(
-            messages=string, model=self.model, api_key=self.api_key
-        )
+        result = get_litellm_embedding(messages=string, model=self.model, api_key=self.api_key)
 
         return result.data[0]["embedding"]
 
@@ -484,13 +480,9 @@ class VisionAgent:
     def append_message(self, message_type: MessageType, content: str):
         if message_type == MessageType.IMAGE_PATH:
             content = f"data:image/jpeg;base64,{base64.b64encode(open(content, 'rb').read()).decode('utf-8')}"
-            self.content_cache.append(
-                {"type": "image_url", "image_url": {"url": content}}
-            )
+            self.content_cache.append({"type": "image_url", "image_url": {"url": content}})
         elif message_type == MessageType.IMAGE_URL:
-            self.content_cache.append(
-                {"type": "image_url", "image_url": {"url": content}}
-            )
+            self.content_cache.append({"type": "image_url", "image_url": {"url": content}})
         elif message_type == MessageType.IMAGE_BASE64:
             self.content_cache.append(
                 {
@@ -507,9 +499,7 @@ class VisionAgent:
         self.messages = [{"role": "system", "content": self.default_prompt}]
         self.content_cache = []
 
-    def chat(
-        self, input: List[Any] = None, append: bool = False, max_tokens: int = 1000
-    ) -> str:
+    def chat(self, input: List[Any] = None, append: bool = False, max_tokens: int = 1000) -> str:
         if input is None:
             # combine cache and new message
             content = self.content_cache
