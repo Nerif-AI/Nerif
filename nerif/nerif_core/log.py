@@ -21,7 +21,7 @@ def set_up_logging(
 
     basic_formatting = NerifFormatter(fmt)
 
-    if out_file != None:
+    if out_file is not None:
         if time_stamp:
             t_string = datetime.now().strftime(" %Y-%m-%d %H-%M-%S")
             out_file = timestamp_filename(out_file, t_string)
@@ -35,7 +35,7 @@ def set_up_logging(
         stream_handler.setFormatter(basic_formatting)
         logger.addHandler(stream_handler)
 
-    if std or out_file != None:
+    if std or out_file is not None:
         logger.info("-" * 20)
         logger.info("logging enabled")
 
@@ -72,21 +72,21 @@ class NerifFormatter(logging.Formatter):
     @staticmethod
     def prettify(d, indented=2):
         rec = NerifFormatter.prettify
-        if type(d) == dict:
+        if type(d) is dict:
             item = [f"{rec(k)}: {rec(v, indented + 1)}," for k, v in d.items()]
             item.insert(0, "{")
             item_string = f"\n{INDENT * indented}".join(item)
             unindented = INDENT * (indented - 1)
             return "%s\n%s}" % (item_string, unindented)
 
-        if type(d) == list:
+        if type(d) is list:
             item = [f"{rec(k, indented + 1)}," for k in d]
             item.insert(0, "[")
             item_string = f"\n{INDENT * indented}".join(item)
             unindented = INDENT * (indented - 1)
             return "%s\n%s]" % (item_string, unindented)
 
-        if type(d) == str:
+        if type(d) is str:
             return f'"{d}"'
 
         return str(d)

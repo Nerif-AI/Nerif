@@ -299,7 +299,7 @@ class SimpleChatAgent:
         if self.model.startswith("ollama"):
             # ??? why is here a model_name never used
             # Model name is used to count tokens(price) @2024-10-05
-            model_name = self.model.split("/")[1]
+            # model_name = self.model.split("/")[1]
 
             LOGGER.debug(
                 "requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>",
