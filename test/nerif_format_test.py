@@ -1,14 +1,20 @@
 import unittest
 import warnings
 
-from nerif.nerif_core import NerifFormat
-from nerif.nerif_core import FormatVerifierFloat, FormatVerifierInt, FormatVerifierListInt, FormatVerifierHumanReadableList
+from nerif.core import (
+    FormatVerifierFloat,
+    FormatVerifierHumanReadableList,
+    FormatVerifierInt,
+    FormatVerifierListInt,
+    NerifFormat,
+)
+
 
 class TestNerifFormat(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         warnings.filterwarnings("ignore")
-        
+
     def test_format_verifier_int(self):
         dummy_response1 = "1"
         dummy_response2 = "The result is: 1"
@@ -17,11 +23,11 @@ class TestNerifFormat(unittest.TestCase):
         result2 = formatter.try_convert(dummy_response2, FormatVerifierInt)
         self.assertEqual(result1, 1)
         self.assertEqual(result2, 1)
-        
+
         failed_response1 = "There is no available result"
         with self.assertRaises(ValueError):
             formatter.try_convert(failed_response1, FormatVerifierInt)
-    
+
     def test_format_verifier_float(self):
         dummy_response1 = "1.0"
         dummy_response2 = "The result is: 1.0"
@@ -30,11 +36,11 @@ class TestNerifFormat(unittest.TestCase):
         result2 = formatter.try_convert(dummy_response2, FormatVerifierFloat)
         self.assertEqual(result1, 1.0)
         self.assertEqual(result2, 1.0)
-        
+
         failed_response1 = "There is no available result"
         with self.assertRaises(ValueError):
             formatter.try_convert(failed_response1, FormatVerifierFloat)
-            
+
     def test_format_verifier_list_int(self):
         dummy_response1 = "[1,2,3]"
         dummy_response2 = "The result is: [1,2,3]"
@@ -43,11 +49,11 @@ class TestNerifFormat(unittest.TestCase):
         result2 = formatter.try_convert(dummy_response2, FormatVerifierListInt)
         self.assertEqual(result1, [1, 2, 3])
         self.assertEqual(result2, [1, 2, 3])
-        
+
         failed_response1 = "There is no available result"
         with self.assertRaises(ValueError):
             formatter.try_convert(failed_response1, FormatVerifierListInt)
-    
+
     def test_format_verifier_human_readable_list(self):
         human_readable_list = """
         Here are some fluits:
@@ -59,12 +65,17 @@ class TestNerifFormat(unittest.TestCase):
         6.     Fig
         """
         formatter = NerifFormat()
-        result_list = formatter.try_convert(human_readable_list, FormatVerifierHumanReadableList)
-        self.assertEqual(result_list, ["Apple", "Banana", "Cherry", "Durian", "Elderberry", "Fig"])
-        
+        result_list = formatter.try_convert(
+            human_readable_list, FormatVerifierHumanReadableList
+        )
+        self.assertEqual(
+            result_list, ["Apple", "Banana", "Cherry", "Durian", "Elderberry", "Fig"]
+        )
+
         failed_response1 = "There is no available result"
         with self.assertRaises(ValueError):
             formatter.try_convert(failed_response1, FormatVerifierHumanReadableList)
-  
+
+
 if __name__ == "__main__":
-  unittest.main()
+    unittest.main()

@@ -1,14 +1,12 @@
-import json
-import os
-import uuid
-from typing import Any, Dict, List, Optional, Union
+import base64
 import logging
+import os
+from enum import Enum, auto
+from typing import Any, Dict, List, Optional, Union
 
-from litellm import completion, embedding
-from openai import OpenAI
+import litellm
 import tiktoken
 
-from .utils import *
 from .nerif_token_counter import NerifTokenCounter
 
 # OpenAI Models
@@ -38,31 +36,60 @@ OPENAI_EMBEDDING_MODEL: List[str] = [
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
 OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
+
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+OR_SITE_URL = os.environ.get("OR_SITE_URL")
+OR_APP_NAME = os.environ.get("OR_APP_NAME")
+
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
-NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get(
+    "NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small"
+)
 
 LOGGER = logging.getLogger("Nerif")
 
+
+class MessageType(Enum):
+    IMAGE_PATH = auto()
+    IMAGE_URL = auto()
+    IMAGE_BASE64 = auto()
+    TEXT = auto()
+
+
 def count_tokens_embedding(model_name, messages: str):
-    encoding = tiktoken.encoding_for_model(model_name=model_name)
+    if model_name.startswith("openrouter"):
+        # FIXME: openrouter encoding is not supported
+        return
+        encoding = tiktoken.encoding_for_model(model_name="text-embedding-3-large")
+    else:
+        encoding = tiktoken.encoding_for_model(model_name=model_name)
     num_tokens = len(encoding.encode(messages))
     NerifTokenCounter.count_tokens_embedding(num_tokens)
 
+
 def count_tokens_request(model_name, messages: List[Dict[str, str]]):
+    if model_name.startswith("openrouter"):
+        # FIXME: openrouter encoding is not supported
+        return
+        encoding = tiktoken.encoding_for_model(model_name="gpt-4o")
+    else:
+        encoding = tiktoken.encoding_for_model(model_name=model_name)
     tokens_per_message = 3
     tokens_per_name = 1
-    encoding = tiktoken.encoding_for_model(model_name=model_name)
     LOGGER.debug(f"{model_name} 's encoder: {encoding}")
     num_tokens = 0
     for message in messages:
         num_tokens += tokens_per_message
         for key, value in message.items():
-            num_tokens += len(encoding.encode(value))
+            # if value is string, count tokens
+            if isinstance(value, str):
+                num_tokens += len(encoding.encode(value))
             if key == "name":
                 num_tokens += tokens_per_name
     num_tokens += 3
     LOGGER.debug(f"Request tokens: {num_tokens}")
     NerifTokenCounter.count_tokens_request(num_tokens)
+
 
 def get_litellm_embedding(
     messages: str,
@@ -75,21 +102,27 @@ def get_litellm_embedding(
             api_key = OPENAI_API_KEY
         if base_url is None or base_url == "":
             base_url = OPENAI_API_BASE
-    
-    # count_tokens_embedding(model, messages)
-    
-    response = embedding(
-        model=model,
-        input=messages,
-        api_key=api_key,
-        base_url=base_url,
-    )
+        kargs = {
+            "model": model,
+            "input": messages,
+            "api_key": api_key,
+            "base_url": base_url,
+        }
+    elif model.startswith("openrouter"):
+        kargs = {
+            "model": model,
+            "input": messages,
+        }
+
+    count_tokens_embedding(model, messages)
+
+    response = litellm.embedding(**kargs)
 
     return response
 
 
 def get_litellm_response(
-    messages: List[Dict[str, str]],
+    messages: List[Any],
     model: str = NERIF_DEFAULT_LLM_MODEL,
     temperature: float = 0,
     max_tokens: int = 300,
@@ -100,7 +133,7 @@ def get_litellm_response(
     top_logprobs: int = 5,
 ) -> Any:
     """
-    Get a text response from an OpenAI model.
+    Get a text response from an litellm model.
 
     Parameters:
     - messages (list): The list of messages to send to the model.
@@ -119,32 +152,33 @@ def get_litellm_response(
             api_key = OPENAI_API_KEY
         if base_url is None or base_url == "":
             base_url = OPENAI_API_BASE
-    # else:
-    #     # Current support claude
-    #     os.environ["CLAUDE_API_KEY"] = api_key
+        kargs = {
+            "model": model,
+            "messages": messages,
+            "api_key": api_key,
+            "base_url": base_url,
+        }
+    elif model.startswith("openrouter"):
+        kargs = {
+            "model": model,
+            "messages": messages,
+        }
+    else:
+        raise ValueError(f"Model {model} not supported")
 
-    # count_tokens_request(model, messages)
+    count_tokens_request(model, messages)
+
+    kargs["stream"] = stream
+    kargs["temperature"] = temperature
+    kargs["max_tokens"] = max_tokens
 
     if logprobs:
-        responses = completion(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            stream=stream,
-            logprobs=logprobs,
-            top_logprobs=top_logprobs,
-        )
-    else:
-        responses = completion(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            stream=stream,
-        )
+        kargs["logprobs"] = logprobs
+        kargs["top_logprobs"] = top_logprobs
 
-    # NerifTokenCounter.count_tokens_response(responses.usage.completion_tokens)
+    responses = litellm.completion(**kargs)
+    NerifTokenCounter.count_tokens_response(responses.usage.completion_tokens)
+
     return responses
 
 
@@ -173,7 +207,7 @@ def get_ollama_response(
     Returns:
     - str or list: The generated text response(s).
     """
-    
+
     # todo: support batch ollama inference
 
     response = get_litellm_response(
@@ -216,7 +250,6 @@ class SimpleChatAgent:
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
-        counter: NerifTokenCounter = NerifTokenCounter()
     ):
         # Set the proxy URL and API key
         if proxy_url is None or proxy_url == "":
@@ -238,8 +271,6 @@ class SimpleChatAgent:
             {"role": "system", "content": default_prompt},
         ]
         self.cost_count = {"input_token_count": 0, "output_token_count": 0}
-        self.chat_uuid = ""
-        self.counter = counter
 
     def reset(self, prompt: Optional[str] = None) -> None:
         # Reset the conversation history
@@ -247,12 +278,9 @@ class SimpleChatAgent:
             prompt = self.default_prompt
 
         self.messages: List[Any] = [{"role": "system", "content": prompt}]
-        self.chat_uuid = str(uuid.uuid4())
 
     def chat(self, message: str, append: bool = False, max_tokens: int = 300) -> str:
         # Append the user's message to the conversation history
-        if not append or self.chat_uuid == "":
-            self.reset()
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
 
@@ -262,23 +290,46 @@ class SimpleChatAgent:
             "max_tokens": max_tokens,
         }
 
+        kwargs = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_tokens": max_tokens,
+        }
+
         if self.model.startswith("ollama"):
             # ??? why is here a model_name never used
-            model_name = self.model.split("/")[1]
+            # Model name is used to count tokens(price) @2024-10-05
+            # model_name = self.model.split("/")[1]
 
-            LOGGER.debug("requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>", self.messages, kwargs)
+            LOGGER.debug(
+                "requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>",
+                self.messages,
+                kwargs,
+            )
             result = get_ollama_response(self.messages, **kwargs)
-
-        elif self.model in OPENAI_MODEL:
-            LOGGER.debug("requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>", self.messages, kwargs)
+        elif self.model.startswith("openrouter"):
+            LOGGER.debug(
+                "requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>",
+                self.messages,
+                kwargs,
+            )
             result = get_litellm_response(self.messages, **kwargs)
-            
+        elif self.model in OPENAI_MODEL:
+            LOGGER.debug(
+                "requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>",
+                self.messages,
+                kwargs,
+            )
+            result = get_litellm_response(self.messages, **kwargs)
+
         else:
             raise ValueError(f"Model {self.model} not supported")
 
         text_result = result.choices[0].message.content
-        self.messages.append({"role": "system", "content": text_result})
-        self.counter.add_message(model_name=self.model, messages=self.messages, chat_id=self.chat_uuid)
+        if append:
+            self.messages.append({"role": "system", "content": text_result})
+        else:
+            self.reset()
         return text_result
 
 
@@ -302,7 +353,6 @@ class SimpleEmbeddingAgent:
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         model: str = "text-embedding-3-small",
-        counter: NerifTokenCounter = NerifTokenCounter()
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -314,15 +364,12 @@ class SimpleEmbeddingAgent:
         self.model = model
         self.proxy_url = proxy_url
         self.api_key = api_key
-        self.counter = counter
 
     def encode(self, string: str) -> List[float]:
         result = get_litellm_embedding(
-            messages=string,
-            model=self.model,
-            api_key=self.api_key
+            messages=string, model=self.model, api_key=self.api_key
         )
-        self.counter.add_message(model_name=self.model, messages=string)
+
         return result.data[0]["embedding"]
 
 
@@ -352,7 +399,6 @@ class LogitsAgent:
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
-        counter: NerifTokenCounter = NerifTokenCounter()
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -371,7 +417,10 @@ class LogitsAgent:
         self.messages: List[Any] = [
             {"role": "system", "content": default_prompt},
         ]
-        self.counter = counter
+        self.cost_count = {"input_token_count": 0, "output_token_count": 0}
+
+    def reset(self):
+        self.messages = [{"role": "system", "content": self.default_prompt}]
 
     def chat(
         self,
@@ -395,8 +444,93 @@ class LogitsAgent:
             )
         else:
             raise ValueError(f"Model {self.model} not supported")
-        
-        text_result = result.choices[0].message.content
-        self.messages.append({"role": "system", "content": text_result})
-        self.counter.add_message(model_name=self.model, messages=self.messages)
+
         return result
+
+
+class VisionAgent:
+    """
+    A simple agent for vision tasks.
+    """
+
+    def __init__(
+        self,
+        proxy_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model: str = NERIF_DEFAULT_LLM_MODEL,
+        default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
+        temperature: float = 0.0,
+    ):
+        if proxy_url is None or proxy_url == "":
+            proxy_url = OPENAI_PROXY_URL
+        elif proxy_url[-1] == "/":
+            proxy_url = proxy_url[:-1]
+        if api_key is None or api_key == "":
+            api_key = OPENAI_API_KEY
+
+        self.model = model
+        self.proxy_url = proxy_url
+        self.api_key = api_key
+        self.temperature = temperature
+
+        # Set the default prompt and initialize the conversation history
+        self.default_prompt = default_prompt
+        self.messages: List[Any] = [
+            {"role": "system", "content": default_prompt},
+        ]
+        self.content_cache = []
+        self.cost_count = {"input_token_count": 0, "output_token_count": 0}
+
+    def append_message(self, message_type: MessageType, content: str):
+        if message_type == MessageType.IMAGE_PATH:
+            content = f"data:image/jpeg;base64,{base64.b64encode(open(content, 'rb').read()).decode('utf-8')}"
+            self.content_cache.append(
+                {"type": "image_url", "image_url": {"url": content}}
+            )
+        elif message_type == MessageType.IMAGE_URL:
+            self.content_cache.append(
+                {"type": "image_url", "image_url": {"url": content}}
+            )
+        elif message_type == MessageType.IMAGE_BASE64:
+            self.content_cache.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{content}"},
+                }
+            )
+        elif message_type == MessageType.TEXT:
+            self.content_cache.append({"type": "text", "text": content})
+        else:
+            raise ValueError(f"Message type {message_type} not supported")
+
+    def reset(self):
+        self.messages = [{"role": "system", "content": self.default_prompt}]
+        self.content_cache = []
+
+    def chat(
+        self, input: List[Any] = None, append: bool = False, max_tokens: int = 1000
+    ) -> str:
+        if input is None:
+            # combine cache and new message
+            content = self.content_cache
+        else:
+            content = self.messages + input
+
+        message = {
+            "role": "user",
+            "content": content,
+        }
+        self.messages.append(message)
+
+        result = get_litellm_response(
+            self.messages,
+            model=self.model,
+            temperature=self.temperature,
+            max_tokens=max_tokens,
+        )
+        text_result = result.choices[0].message.content
+        if append:
+            self.content_cache.append(text_result)
+        else:
+            self.reset()
+        return text_result

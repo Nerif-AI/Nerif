@@ -1,26 +1,31 @@
-import logging
-import sys
-import re
-from typing import Literal
-# import json
 import ast
+import logging
+import re
+import sys
+from datetime import datetime
+from typing import Literal
 
 INDENT = "\t"
 
+
 def set_up_logging(
     out_file: None | str = None,
+    time_stamp: bool = True,
     mode: Literal["a", "w"] = "a",
     fmt: str = "%(levelname)s\t%(name)s\t%(asctime)s\t%(message)s",
     std: bool = False,
     level: int | str = logging.DEBUG,
 ):
-
     logger = logging.getLogger("Nerif")
     logger.setLevel(level)
 
     basic_formatting = NerifFormatter(fmt)
 
-    if out_file != None:
+    if out_file is not None:
+        if time_stamp:
+            t_string = datetime.now().strftime(" %Y-%m-%d %H-%M-%S")
+            out_file = timestamp_filename(out_file, t_string)
+
         file_handler = logging.FileHandler(out_file, mode=mode)
         file_handler.setFormatter(basic_formatting)
         logger.addHandler(file_handler)
@@ -30,9 +35,18 @@ def set_up_logging(
         stream_handler.setFormatter(basic_formatting)
         logger.addHandler(stream_handler)
 
-    if std or out_file != None:
+    if std or out_file is not None:
         logger.info("-" * 20)
         logger.info("logging enabled")
+
+
+def timestamp_filename(filename, t_string):
+    if "." not in filename:
+        return filename + t_string
+
+    p_ext = filename.rindex(".")
+    return f"{filename[:p_ext]}{t_string}{filename[p_ext:]}"
+
 
 # FIXME the name of formatter collide with nerif format, rethink a name
 class NerifFormatter(logging.Formatter):
@@ -42,16 +56,11 @@ class NerifFormatter(logging.Formatter):
         super().__init__(fmt, datefmt, style, validate, defaults=defaults)
 
     def format(self, record):
-
         s = super().format(record)
-        r = re.sub(
-            r"<dict>(.*)</dict>", 
-            lambda x: NerifFormatter.evaller(x),
-            s
-        )
+        r = re.sub(r"<dict>(.*)</dict>", lambda x: NerifFormatter.evaller(x), s)
 
         return r
-    
+
     @staticmethod
     def evaller(d):
         try:
@@ -60,28 +69,24 @@ class NerifFormatter(logging.Formatter):
         except ValueError:
             return f"\n{d.group(1)}\n(parsing error happened)\n"
 
-
     @staticmethod
     def prettify(d, indented=2):
         rec = NerifFormatter.prettify
-        if type(d) == dict:
-            item = [
-                f"{rec(k)}: {rec(v, indented + 1)},"
-                for k,v in d.items()
-            ]
+        if type(d) is dict:
+            item = [f"{rec(k)}: {rec(v, indented + 1)}," for k, v in d.items()]
             item.insert(0, "{")
             item_string = f"\n{INDENT * indented}".join(item)
-            unindented  = INDENT * (indented - 1)
+            unindented = INDENT * (indented - 1)
             return "%s\n%s}" % (item_string, unindented)
-        
-        if type(d) == list:
+
+        if type(d) is list:
             item = [f"{rec(k, indented + 1)}," for k in d]
             item.insert(0, "[")
             item_string = f"\n{INDENT * indented}".join(item)
-            unindented  = INDENT * (indented - 1)
+            unindented = INDENT * (indented - 1)
             return "%s\n%s]" % (item_string, unindented)
 
-        if type(d) == str:
-            return f"\"{d}\""
-        
+        if type(d) is str:
+            return f'"{d}"'
+
         return str(d)

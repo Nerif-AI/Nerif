@@ -1,4 +1,3 @@
-import json
 import re
 
 
@@ -7,13 +6,19 @@ class FormatVerifierBase:
     simple = True
 
     def verify(self, val: str) -> bool:
-        raise NotImplementedError("Verify method of FormatVerifierBase is not implemented")
+        raise NotImplementedError(
+            "Verify method of FormatVerifierBase is not implemented"
+        )
 
     def match(self, val: str) -> any:
-        raise NotImplementedError("Match method of FormatVerifierBase is not implemented")
+        raise NotImplementedError(
+            "Match method of FormatVerifierBase is not implemented"
+        )
 
     def convert(self, val: str) -> any:
-        raise NotImplementedError("Convert method of FormatVerifierBase is not implemented")
+        raise NotImplementedError(
+            "Convert method of FormatVerifierBase is not implemented"
+        )
 
     def __call__(self, val: str) -> any:
         if self.verify(val):
@@ -49,7 +54,7 @@ class FormatVerifierInt(FormatVerifierBase):
 class FormatVerifierFloat(FormatVerifierBase):
     cls = float
     pattern = re.compile(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?")
-    
+
     def verify(self, val: str) -> bool:
         return self.pattern.match(val) is not None
 
@@ -92,26 +97,27 @@ class FormatVerifierListInt(FormatVerifierBase):
             return [int(v) for v in val]
         return None
 
+
 class FormatVerifierHumanReadableList(FormatVerifierBase):
     cls = list[str]
     simple = False
-    pattern = re.compile(r'^\s*\d+\.\s+.*?(?=\n\s*\d+\.|\Z)',
-                     re.MULTILINE | re.DOTALL)
-    
+    pattern = re.compile(r"^\s*\d+\.\s+.*?(?=\n\s*\d+\.|\Z)", re.MULTILINE | re.DOTALL)
+
     def verify(self, val: str) -> bool:
-        return False # Force verifier to use match method
-    
+        return False  # Force verifier to use match method
+
     def match(self, val: str) -> list[str]:
         matches = self.pattern.findall(val)
         matches = [match.strip() for match in matches]
-        matches = [match.split('. ')[1].strip() for match in matches]
+        matches = [match.split(". ")[1].strip() for match in matches]
         if len(matches) > 0:
             return matches
         return None
-    
-    def convert (self, val: str) -> list[str]:
+
+    def convert(self, val: str) -> list[str]:
         return self.match(val)
-    
+
+
 class NerifFormat:
     """
     Convert llm response to given type

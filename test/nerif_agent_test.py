@@ -5,11 +5,9 @@ import warnings
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from nerif.nerif_agent.nerif_agent import (
+from nerif.agent.agent import (
     LogitsAgent,
     SimpleChatAgent,
-    SimpleEmbeddingAgent,
-    NerifTokenCounter
 )
 
 
@@ -69,7 +67,7 @@ class TestNerifAgent(unittest.TestCase):
         result = logits_agent.chat("Hello, how are you?", max_tokens=1)
         print(result)
         self.assertIsNotNone(result)
-    
+
     def test_ollama_agent(self):
         ollama_agent = SimpleChatAgent(model="ollama/llama3.1")
         result = ollama_agent.chat("Hello, how are you?")
