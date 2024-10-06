@@ -301,25 +301,19 @@ class SimpleChatAgent:
             # Model name is used to count tokens(price) @2024-10-05
             # model_name = self.model.split("/")[1]
 
-            LOGGER.debug(
-                "requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>",
-                self.messages,
-                kwargs,
-            )
+            LOGGER.debug("requested with message: %s", self.messages)
+            LOGGER.debug("arguments of request: %s", kwargs)
+
             result = get_ollama_response(self.messages, **kwargs)
         elif self.model.startswith("openrouter"):
-            LOGGER.debug(
-                "requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>",
-                self.messages,
-                kwargs,
-            )
+            LOGGER.debug("requested with message: %s", self.messages)
+            LOGGER.debug("arguments of request: %s", kwargs)
+
             result = get_litellm_response(self.messages, **kwargs)
         elif self.model in OPENAI_MODEL:
-            LOGGER.debug(
-                "requested with following:\n\tmessage: <dict> %s </dict> \n\targuments of request: <dict> %s </dict>",
-                self.messages,
-                kwargs,
-            )
+            LOGGER.debug("requested with message: %s", self.messages)
+            LOGGER.debug("arguments of request: %s", kwargs)
+
             result = get_litellm_response(self.messages, **kwargs)
 
         else:
