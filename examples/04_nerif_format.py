@@ -31,13 +31,13 @@ print(dummy_response6, "->", result6)
 failed_response1 = "There is no available result"
 try:
     result7 = formatter.try_convert(failed_response1, FormatVerifierInt)
-except ValueError as e:
+except ValueError:
     print('We cannot convert the response "{}" to int'.format(failed_response1))
 
 failed_response2 = "The result is: 114514"
 try:
     result8 = formatter.try_convert(failed_response2, FormatVerifierFloat)
-except ValueError as e:
+except ValueError:
     print('We cannot convert the response "{}" to float'.format(failed_response2))
 
 human_readable_list = """

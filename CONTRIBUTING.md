@@ -20,7 +20,7 @@ isort .
 # Check code format
 ruff check
 
-# Run code format
+#Run code format
 ruff format
 ```
 
@@ -325,5 +325,5 @@ git push origin v<x.x.x>
 
    ```bash
    # Create a virtual environment
-   pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ serverless-llm-store==0.0.1dev4
+   pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ nerif==0.0.1dev4
    ```

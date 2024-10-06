@@ -8,7 +8,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from nerif.nerif_agent.nerif_agent import (
     LogitsAgent,
     SimpleChatAgent,
-    SimpleEmbeddingAgent,
 )
 
 

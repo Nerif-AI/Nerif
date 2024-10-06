@@ -1,4 +1,3 @@
-from nerif.nerif_agent import SimpleChatAgent
 from nerif.nerif_core import nerif_match_string
 
 selections = ["iPhone 5", "iPhone 6", "iPhone 12"]
