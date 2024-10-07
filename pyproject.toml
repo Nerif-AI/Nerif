@@ -21,7 +21,8 @@ dependencies = [
     "httpx",
     "openai",
     "python-dotenv",
-    "litellm"
+    "litellm",
+    "prettytable"
 ]
 requires-python = ">=3.8"
 

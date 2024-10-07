@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Dict, List
 
-import tiktoken
+from prettytable import PrettyTable
 
 from .utils import OPENAI_EMBEDDING_MODEL, OPENAI_MODEL
 
@@ -18,7 +18,7 @@ class ModelCost:
         self.response += response
 
     def __repr__(self) -> str:
-        return f"{self.model_name}: {self.request} tokens requested, {self.response} tokens returned"
+        return f"{self.request} tokens requested, {self.response} tokens returned"
 
 
 class NerifTokenConsume:
@@ -39,7 +39,11 @@ class NerifTokenConsume:
         return self
 
     def __repr__(self) -> str:
-        return str(self.model_cost)
+        table = PrettyTable()
+        table.field_names = ["model name", "requested tokens", "response tokens"]
+        for key, value in self.model_cost.items():
+            table.add_row([key, value.request, value.response])
+        return table.get_string()
 
 
 class ResponseParserBase:
