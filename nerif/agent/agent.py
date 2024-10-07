@@ -62,7 +62,7 @@ def count_tokens_embedding(model_name, messages: str):
     else:
         encoding = tiktoken.encoding_for_model(model_name=model_name)
     num_tokens = len(encoding.encode(messages))
-    NerifTokenCounter.count_tokens_embedding(num_tokens)
+    # NerifTokenCounter.count_tokens_embedding(num_tokens)
 
 
 def count_tokens_request(model_name, messages: List[Dict[str, str]]):
@@ -86,7 +86,7 @@ def count_tokens_request(model_name, messages: List[Dict[str, str]]):
                 num_tokens += tokens_per_name
     num_tokens += 3
     LOGGER.debug(f"Request tokens: {num_tokens}")
-    NerifTokenCounter.count_tokens_request(num_tokens)
+    # NerifTokenCounter.count_tokens_request(num_tokens)
 
 
 def get_litellm_embedding(
@@ -164,8 +164,6 @@ def get_litellm_response(
     else:
         raise ValueError(f"Model {model} not supported")
 
-    count_tokens_request(model, messages)
-
     kargs["stream"] = stream
     kargs["temperature"] = temperature
     kargs["max_tokens"] = max_tokens
@@ -175,7 +173,6 @@ def get_litellm_response(
         kargs["top_logprobs"] = top_logprobs
 
     responses = litellm.completion(**kargs)
-    NerifTokenCounter.count_tokens_response(responses.usage.completion_tokens)
 
     return responses
 
