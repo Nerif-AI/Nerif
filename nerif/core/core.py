@@ -3,7 +3,12 @@ from typing import Any, List, Optional
 
 import numpy as np
 
-from ..agent import LogitsAgent, SimpleChatAgent, SimpleEmbeddingAgent
+from ..agent import (
+    LogitsAgent,
+    NerifTokenCounter,
+    SimpleChatAgent,
+    SimpleEmbeddingAgent,
+)
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
@@ -29,6 +34,7 @@ class NerificationBase:
         self,
         possible_values: Optional[List[Any]] = None,
         model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
+        counter: Optional[NerifTokenCounter] = None,
     ):
         """
         Initialize the NerificationBase.
@@ -44,7 +50,7 @@ class NerificationBase:
         for index in range(len(possible_values)):
             self.possible.append(self.convert(possible_values[index]))
 
-        self.embedding = SimpleEmbeddingAgent(model=model)
+        self.embedding = SimpleEmbeddingAgent(model=model, counter=counter)
         self.possible_embed = []
 
         # Embed the possible value and the possible instruction
@@ -113,8 +119,9 @@ class Nerification(NerificationBase):
     def __init__(
         self,
         model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
+        counter: Optional[NerifTokenCounter] = None,
     ):
-        super().__init__([True, False], model)
+        super().__init__([True, False], model, counter)
 
     def convert(self, val: Any):
         return str(val).lower()
@@ -141,8 +148,9 @@ class NerificationString(NerificationBase):
         self,
         possible_values: Optional[List[str]] = None,
         model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
+        counter: Optional[NerifTokenCounter] = None,
     ):
-        super().__init__(possible_values, model)
+        super().__init__(possible_values, model, counter)
 
     def convert(self, val: Any):
         return val.lower()
@@ -166,6 +174,7 @@ class NerificationInt(NerificationBase):
         self,
         possible_values: Optional[List[int]] = None,
         model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
+        counter: Optional[NerifTokenCounter] = None,
     ):
         super().__init__(possible_values, model)
 
@@ -205,7 +214,7 @@ class Nerif:
             Judge the truthfulness of the statement.
     """
 
-    def __init__(self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, debug=False):
+    def __init__(self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, counter=None, debug=False):
         self.model = model
         self.prompt = (
             "Given the following text, determine if the statement is true or false.\n"
@@ -213,9 +222,9 @@ class Nerif:
             "Only answer with 'True' or 'False'."
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(model=model, temperature=temperature)
-        self.logits_agent = LogitsAgent(model=model, temperature=temperature)
-        self.verification = Nerification()
+        self.agent = SimpleChatAgent(model=model, temperature=temperature, counter=counter)
+        self.logits_agent = LogitsAgent(model=model, temperature=temperature, counter=counter)
+        self.verification = Nerification(counter=counter)
         self.debug = debug
 
         if self.debug:
@@ -295,17 +304,17 @@ class Nerif:
         return result
 
     @classmethod
-    def instance(cls, text, max_retry=5, model="gpt-4o", debug=False):
-        new_instance = cls(model=model, debug=debug)
+    def instance(cls, text, max_retry=5, model="gpt-4o", debug=False, counter=None):
+        new_instance = cls(model=model, debug=debug, counter=counter)
         return new_instance.judge(text, max_retry=max_retry)
 
 
-def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, debug=False):
-    return Nerif.instance(text, model=model, debug=debug)
+def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, debug=False, counter=None):
+    return Nerif.instance(text, model=model, debug=debug, counter=counter)
 
 
 class NerifMatchString:
-    def __init__(self, choices: List[str], model=NERIF_DEFAULT_LLM_MODEL, temperature=0):
+    def __init__(self, choices: List[str], model=NERIF_DEFAULT_LLM_MODEL, temperature=0, counter=None):
         self.choices = choices
         self.model = model
         self.prompt = (
@@ -324,17 +333,9 @@ class NerifMatchString:
             "Choose the best choice from the following options.\n" "Only give me the choice ID, only a number: "
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(
-            model=model,
-            temperature=temperature,
-        )
-        self.logits_agent = LogitsAgent(
-            model=model,
-            temperature=temperature,
-        )
-        self.verification = NerificationInt(
-            possible_values=[x for x in range(0, len(choices))],
-        )
+        self.agent = SimpleChatAgent(model=model, temperature=temperature, counter=counter)
+        self.logits_agent = LogitsAgent(model=model, temperature=temperature, counter=counter)
+        self.verification = NerificationInt(possible_values=[x for x in range(0, len(choices))], counter=counter)
         self.instruction_verification = NerificationString(
             possible_values=choices,
         )
@@ -394,14 +395,14 @@ class NerifMatchString:
         return result
 
     @classmethod
-    def instance(cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL):
-        new_instance = cls(selections, model=model)
+    def instance(cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL, counter=None):
+        new_instance = cls(selections, model=model, counter=counter)
         return new_instance.match(text, max_retry=max_retry)
 
 
-def nerif_match_string(selections, text, model=NERIF_DEFAULT_LLM_MODEL) -> int:
-    return NerifMatchString.instance(selections, text, model=model)
+def nerif_match_string(selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=None) -> int:
+    return NerifMatchString.instance(selections, text, model=model, counter=counter)
 
 
-def nerif_match(selections, text, model=NERIF_DEFAULT_LLM_MODEL) -> int:
-    return NerifMatchString.instance(selections, text, model=model)
+def nerif_match(selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=None) -> int:
+    return NerifMatchString.instance(selections, text, model=model, counter=counter)
