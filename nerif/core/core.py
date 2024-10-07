@@ -3,7 +3,7 @@ from typing import Any, List, Optional
 
 import numpy as np
 
-from nerif.agent.agent import LogitsAgent, SimpleChatAgent, SimpleEmbeddingAgent
+from ..agent import LogitsAgent, SimpleChatAgent, SimpleEmbeddingAgent
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
