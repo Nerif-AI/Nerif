@@ -59,6 +59,7 @@ def get_litellm_embedding(
     model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
+    counter: Optional[NerifTokenCounter] = None,
 ) -> Any:
     if model in OPENAI_EMBEDDING_MODEL:
         if api_key is None or api_key == "":
@@ -77,9 +78,11 @@ def get_litellm_embedding(
             "input": messages,
         }
 
-    count_tokens_embedding(model, messages)
-
     response = litellm.embedding(**kargs)
+
+    if counter is not None:
+        counter.set_parser_based_on_model(model)
+        counter.count_from_response(response)
 
     return response
 
@@ -94,6 +97,7 @@ def get_litellm_response(
     base_url: Optional[str] = None,
     logprobs: bool = False,
     top_logprobs: int = 5,
+    counter: Optional[NerifTokenCounter] = None,
 ) -> Any:
     """
     Get a text response from an litellm model.
@@ -139,6 +143,10 @@ def get_litellm_response(
 
     responses = litellm.completion(**kargs)
 
+    if counter is not None:
+        counter.set_parser_based_on_model(model)
+        counter.count_from_response(responses)
+
     return responses
 
 
@@ -150,6 +158,7 @@ def get_ollama_response(
     temperature: float = 0,
     stream: bool = False,
     api_key: Optional[str] = "ollama",
+    counter: Optional[NerifTokenCounter] = None,
 ) -> Union[str, List[str]]:
     """
     Get a text response from an Ollama model.
@@ -179,6 +188,10 @@ def get_ollama_response(
         api_key=api_key,
         base_url=url,
     )
+
+    if counter is not None:
+        counter.set_parser_based_on_model(model)
+        counter.count_from_response(response)
 
     return response
 
@@ -256,6 +269,9 @@ class SimpleChatAgent:
             "max_tokens": max_tokens,
         }
 
+        if self.counter is not None:
+            kwargs["counter"] = self.counter
+
         if self.model.startswith("ollama"):
             # ??? why is here a model_name never used
             # Model name is used to count tokens(price) @2024-10-05
@@ -313,6 +329,7 @@ class SimpleEmbeddingAgent:
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         model: str = "text-embedding-3-small",
+        counter: Optional[NerifTokenCounter] = None,
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -324,9 +341,10 @@ class SimpleEmbeddingAgent:
         self.model = model
         self.proxy_url = proxy_url
         self.api_key = api_key
+        self.counter = counter
 
     def encode(self, string: str) -> List[float]:
-        result = get_litellm_embedding(messages=string, model=self.model, api_key=self.api_key)
+        result = get_litellm_embedding(messages=string, model=self.model, api_key=self.api_key, counter=self.counter)
 
         return result.data[0]["embedding"]
 
@@ -357,6 +375,7 @@ class LogitsAgent:
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
+        counter: Optional[NerifTokenCounter] = None,
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -375,7 +394,7 @@ class LogitsAgent:
         self.messages: List[Any] = [
             {"role": "system", "content": default_prompt},
         ]
-        self.cost_count = {"input_token_count": 0, "output_token_count": 0}
+        self.counter = counter
 
     def reset(self):
         self.messages = [{"role": "system", "content": self.default_prompt}]
@@ -399,6 +418,7 @@ class LogitsAgent:
                 max_tokens=max_tokens,
                 logprobs=logprobs,
                 top_logprobs=top_logprobs,
+                counter=self.counter,
             )
         else:
             raise ValueError(f"Model {self.model} not supported")
@@ -418,6 +438,7 @@ class VisionAgent:
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
+        counter: Optional[NerifTokenCounter] = None,
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -438,6 +459,7 @@ class VisionAgent:
         ]
         self.content_cache = []
         self.cost_count = {"input_token_count": 0, "output_token_count": 0}
+        self.couter = counter
 
     def append_message(self, message_type: MessageType, content: str):
         if message_type == MessageType.IMAGE_PATH:
@@ -475,10 +497,7 @@ class VisionAgent:
         self.messages.append(message)
 
         result = get_litellm_response(
-            self.messages,
-            model=self.model,
-            temperature=self.temperature,
-            max_tokens=max_tokens,
+            self.messages, model=self.model, temperature=self.temperature, max_tokens=max_tokens, counter=self.couter
         )
         text_result = result.choices[0].message.content
         if append:
