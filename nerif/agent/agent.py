@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 import litellm
 import tiktoken
 
-from .nerif_token_counter import NerifTokenCounter
+from .token_counter import NerifTokenCounter
 
 # OpenAI Models
 OPENAI_MODEL: List[str] = [
