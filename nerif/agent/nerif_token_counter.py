@@ -48,7 +48,7 @@ class ResponseParserBase:
 
 
 class OpenAIResponseParser(ResponseParserBase):
-    def __call__(self, response) -> NerifTokenConsume:
+    def __call__(self, response) -> ModelCost:
         model_name = response.model
         response_type = response.__class__.__name__
         if response_type == "EmbeddingResponse":
@@ -58,6 +58,16 @@ class OpenAIResponseParser(ResponseParserBase):
             usage = response.usage
             requested_tokens = usage.prompt_tokens
             completation_tokens = usage.completion_tokens
+
+        consume = ModelCost(model_name, requested_tokens, completation_tokens)
+        return consume
+
+
+class OllamaResponseParser(ResponseParserBase):
+    def __call__(self, response) -> ModelCost:
+        model_name = response.model
+        requested_tokens = response.prompt_eval_count
+        completation_tokens = response.eval_count
 
         consume = ModelCost(model_name, requested_tokens, completation_tokens)
         return consume
@@ -79,6 +89,12 @@ class NerifTokenCounter:
 
     def set_parser(self, parser: ResponseParserBase):
         self.response_parser = parser
+
+    def set_parser_based_on_model(self, model_name: str):
+        if model_name.startswith("ollama"):
+            self.set_parser(OllamaResponseParser())
+        else:
+            self.set_parser(OpenAIResponseParser())
 
     def count_from_response(self, response):
         """

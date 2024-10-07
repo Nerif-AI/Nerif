@@ -39,6 +39,15 @@ class TestTokenCounter(unittest.TestCase):
         self.assertEqual(len(counter.model_token.model_cost), 3)
         print(counter.model_token)
 
+    def test_set_parser(self):
+        counter = NerifTokenCounter()
+        counter.set_parser_based_on_model("gpt-4o")
+        self.assertEqual(counter.response_parser.__class__.__name__, "OpenAIResponseParser")
+        counter.set_parser_based_on_model("ollama/llama3.1")
+        self.assertEqual(counter.response_parser.__class__.__name__, "OllamaResponseParser")
+        counter.set_parser_based_on_model("openrouter/llama3.1")
+        self.assertEqual(counter.response_parser.__class__.__name__, "OpenAIResponseParser")
+
 
 if __name__ == "__main__":
     unittest.main()

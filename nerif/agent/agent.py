@@ -54,41 +54,6 @@ class MessageType(Enum):
     TEXT = auto()
 
 
-def count_tokens_embedding(model_name, messages: str):
-    if model_name.startswith("openrouter"):
-        # FIXME: openrouter encoding is not supported
-        return
-        encoding = tiktoken.encoding_for_model(model_name="text-embedding-3-large")
-    else:
-        encoding = tiktoken.encoding_for_model(model_name=model_name)
-    num_tokens = len(encoding.encode(messages))
-    # NerifTokenCounter.count_tokens_embedding(num_tokens)
-
-
-def count_tokens_request(model_name, messages: List[Dict[str, str]]):
-    if model_name.startswith("openrouter"):
-        # FIXME: openrouter encoding is not supported
-        return
-        encoding = tiktoken.encoding_for_model(model_name="gpt-4o")
-    else:
-        encoding = tiktoken.encoding_for_model(model_name=model_name)
-    tokens_per_message = 3
-    tokens_per_name = 1
-    LOGGER.debug(f"{model_name} 's encoder: {encoding}")
-    num_tokens = 0
-    for message in messages:
-        num_tokens += tokens_per_message
-        for key, value in message.items():
-            # if value is string, count tokens
-            if isinstance(value, str):
-                num_tokens += len(encoding.encode(value))
-            if key == "name":
-                num_tokens += tokens_per_name
-    num_tokens += 3
-    LOGGER.debug(f"Request tokens: {num_tokens}")
-    # NerifTokenCounter.count_tokens_request(num_tokens)
-
-
 def get_litellm_embedding(
     messages: str,
     model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
@@ -231,7 +196,6 @@ class SimpleChatAgent:
         default_prompt (str): The default system prompt for the chat.
         temperature (float): The temperature setting for response generation.
         messages (List[Any]): The conversation history.
-        cost_count (dict): Tracks token usage for input and output.
 
     Methods:
         reset(prompt=None): Resets the conversation history.
@@ -245,6 +209,7 @@ class SimpleChatAgent:
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
+        counter: NerifTokenCounter = None,
     ):
         # Set the proxy URL and API key
         if proxy_url is None or proxy_url == "":
@@ -265,7 +230,7 @@ class SimpleChatAgent:
         self.messages: List[Any] = [
             {"role": "system", "content": default_prompt},
         ]
-        self.cost_count = {"input_token_count": 0, "output_token_count": 0}
+        self.counter = counter
 
     def reset(self, prompt: Optional[str] = None) -> None:
         # Reset the conversation history
