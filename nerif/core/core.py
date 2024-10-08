@@ -14,7 +14,9 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
 OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
-NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get(
+    "NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small"
+)
 
 
 def similarity_dist(vec1, vec2, func="cosine"):
@@ -214,7 +216,9 @@ class Nerif:
             Judge the truthfulness of the statement.
     """
 
-    def __init__(self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, counter=None, debug=False):
+    def __init__(
+        self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, counter=None, debug=False
+    ):
         self.model = model
         self.prompt = (
             "Given the following text, determine if the statement is true or false.\n"
@@ -222,8 +226,12 @@ class Nerif:
             "Only answer with 'True' or 'False'."
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(model=model, temperature=temperature, counter=counter)
-        self.logits_agent = LogitsAgent(model=model, temperature=temperature, counter=counter)
+        self.agent = SimpleChatAgent(
+            model=model, temperature=temperature, counter=counter
+        )
+        self.logits_agent = LogitsAgent(
+            model=model, temperature=temperature, counter=counter
+        )
         self.verification = Nerification(counter=counter)
         self.debug = debug
 
@@ -250,10 +258,15 @@ class Nerif:
         if not (hasattr(response, "choices") and len(response.choices) > 0):
             return None
         # if choices doesn't have no logprobs, raise an exception
-        if not hasattr(response.choices[0], "logprobs") or response.choices[0].logprobs is None:
+        if (
+            not hasattr(response.choices[0], "logprobs")
+            or response.choices[0].logprobs is None
+        ):
             return None
         logprobs = response.choices[0].logprobs["content"][0]
-        sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
+        sorted_logprobs = sorted(
+            logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True
+        )
         # Try to find the most likely logprob
         for index in range(len(sorted_logprobs)):
             if self.debug:
@@ -314,7 +327,13 @@ def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, debug=False, counter=None):
 
 
 class NerifMatchString:
-    def __init__(self, choices: List[str], model=NERIF_DEFAULT_LLM_MODEL, temperature=0, counter=None):
+    def __init__(
+        self,
+        choices: List[str],
+        model=NERIF_DEFAULT_LLM_MODEL,
+        temperature=0,
+        counter=None,
+    ):
         self.choices = choices
         self.model = model
         self.prompt = (
@@ -330,12 +349,19 @@ class NerifMatchString:
         self.prompt += "Now the question is:\n"
         self.prompt += "<question>\n"
         self.prompt += (
-            "Choose the best choice from the following options.\n" "Only give me the choice ID, only a number: "
+            "Choose the best choice from the following options.\n"
+            "Only give me the choice ID, only a number: "
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(model=model, temperature=temperature, counter=counter)
-        self.logits_agent = LogitsAgent(model=model, temperature=temperature, counter=counter)
-        self.verification = NerificationInt(possible_values=[x for x in range(0, len(choices))], counter=counter)
+        self.agent = SimpleChatAgent(
+            model=model, temperature=temperature, counter=counter
+        )
+        self.logits_agent = LogitsAgent(
+            model=model, temperature=temperature, counter=counter
+        )
+        self.verification = NerificationInt(
+            possible_values=[x for x in range(0, len(choices))], counter=counter
+        )
         self.instruction_verification = NerificationString(
             possible_values=choices,
         )
@@ -350,10 +376,15 @@ class NerifMatchString:
         # Fetch the logprobs of the logits
         if not (hasattr(response, "choices") and len(response.choices) > 0):
             return None
-        if not hasattr(response.choices[0], "logprobs") or response.choices[0].logprobs is None:
+        if (
+            not hasattr(response.choices[0], "logprobs")
+            or response.choices[0].logprobs is None
+        ):
             return None
         logprobs = response.choices[0].logprobs["content"][0]
-        sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
+        sorted_logprobs = sorted(
+            logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True
+        )
         # Try to find the most likely logprob
         for index in range(len(sorted_logprobs)):
             simple_fit = self.verification.simple_fit(sorted_logprobs[index]["token"])
@@ -395,12 +426,16 @@ class NerifMatchString:
         return result
 
     @classmethod
-    def instance(cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL, counter=None):
+    def instance(
+        cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL, counter=None
+    ):
         new_instance = cls(selections, model=model, counter=counter)
         return new_instance.match(text, max_retry=max_retry)
 
 
-def nerif_match_string(selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=None) -> int:
+def nerif_match_string(
+    selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=None
+) -> int:
     return NerifMatchString.instance(selections, text, model=model, counter=counter)
 
 

@@ -50,7 +50,9 @@ def timestamp_filename(filename, t_string):
 
 # FIXME the name of formatter collide with nerif format, rethink a name
 class NerifFormatter(logging.Formatter):
-    def __init__(self, fmt=None, datefmt=None, style="%", validate=True, *, defaults=None) -> None:
+    def __init__(
+        self, fmt=None, datefmt=None, style="%", validate=True, *, defaults=None
+    ) -> None:
         super().__init__(fmt, datefmt, style, validate, defaults=defaults)
 
     def format(self, record):

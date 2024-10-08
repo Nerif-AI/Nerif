@@ -8,22 +8,28 @@ from nerif.core import nerif
 
 pretty_printer = pprint.PrettyPrinter()
 
-class TestTokenCounter(unittest.TestCase):
 
+class TestTokenCounter(unittest.TestCase):
     def test_counting_completion_raw(self):
         counter = NerifTokenCounter()
         response = completion(
-            model="openrouter/openai/gpt-4o-2024-08-06", messages=[{"role": "user", "content": "Hello"}]
+            model="openrouter/openai/gpt-4o-2024-08-06",
+            messages=[{"role": "user", "content": "Hello"}],
         )
         counter.count_from_response(response)
         response = completion(
-            model="openrouter/openai/gpt-4o-2024-08-06", messages=[{"role": "user", "content": "Hello From World"}]
+            model="openrouter/openai/gpt-4o-2024-08-06",
+            messages=[{"role": "user", "content": "Hello From World"}],
         )
         counter.count_from_response(response)
 
         self.assertEqual(len(counter.model_token.model_cost), 1)
-        self.assertGreater(counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].request, 0)
-        self.assertGreater(counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].response, 0)
+        self.assertGreater(
+            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].request, 0
+        )
+        self.assertGreater(
+            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].response, 0
+        )
 
     def test_counting_embedding_raw(self):
         counter = NerifTokenCounter()
@@ -37,13 +43,15 @@ class TestTokenCounter(unittest.TestCase):
     def test_counting_mixed_raw(self):
         counter = NerifTokenCounter()
         response = completion(
-            model="openrouter/openai/gpt-4o-2024-08-06", messages=[{"role": "user", "content": "Hello"}]
+            model="openrouter/openai/gpt-4o-2024-08-06",
+            messages=[{"role": "user", "content": "Hello"}],
         )
         counter.count_from_response(response)
         response = embedding(model="text-embedding-3-small", input="Hello")
         counter.count_from_response(response)
         response = completion(
-            model="openrouter/openai/gpt-3.5-turbo", messages=[{"role": "user", "content": "Hello From World"}]
+            model="openrouter/openai/gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "Hello From World"}],
         )
         counter.count_from_response(response)
 
@@ -51,7 +59,6 @@ class TestTokenCounter(unittest.TestCase):
         print(counter.model_token)
 
     def test_couting_agent(self):
-        
         counter = NerifTokenCounter()
         chat_agent = SimpleChatAgent(counter=counter)
         embedding_agent = SimpleEmbeddingAgent(counter=counter)
@@ -77,11 +84,17 @@ class TestTokenCounter(unittest.TestCase):
     def test_set_parser(self):
         counter = NerifTokenCounter()
         counter.set_parser_based_on_model("openrouter/openai/gpt-4o-2024-08-06")
-        self.assertEqual(counter.response_parser.__class__.__name__, "OpenAIResponseParser")
+        self.assertEqual(
+            counter.response_parser.__class__.__name__, "OpenAIResponseParser"
+        )
         counter.set_parser_based_on_model("ollama/llama3.1")
-        self.assertEqual(counter.response_parser.__class__.__name__, "OllamaResponseParser")
+        self.assertEqual(
+            counter.response_parser.__class__.__name__, "OllamaResponseParser"
+        )
         counter.set_parser_based_on_model("openrouter/meta/llama3.1")
-        self.assertEqual(counter.response_parser.__class__.__name__, "OpenAIResponseParser")
+        self.assertEqual(
+            counter.response_parser.__class__.__name__, "OpenAIResponseParser"
+        )
 
 
 if __name__ == "__main__":

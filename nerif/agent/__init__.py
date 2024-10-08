@@ -19,6 +19,7 @@ __all__ = [
     "get_ollama_response",
     "SimpleChatAgent",
     "SimpleEmbeddingAgent",
+    "NerifTokenCounter",
     "LogitsAgent",
     "VisionAgent",
 ]

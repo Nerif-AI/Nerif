@@ -1,10 +1,4 @@
-import uuid
-from dataclasses import dataclass
-from typing import Dict, List
-
 from prettytable import PrettyTable
-
-from .utils import OPENAI_EMBEDDING_MODEL, OPENAI_MODEL
 
 
 class ModelCost:
@@ -22,7 +16,6 @@ class ModelCost:
 
 
 class NerifTokenConsume:
-
     def __init__(self):
         self.model_cost = {}
 
