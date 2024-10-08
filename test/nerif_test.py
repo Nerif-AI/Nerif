@@ -4,7 +4,7 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from nerif.core import core, nerif_match
+from nerif.core import core, nerif_match, nerif_match_string
 
 
 class MyTestCase(unittest.TestCase):
