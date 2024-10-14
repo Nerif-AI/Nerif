@@ -4,7 +4,7 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from nerif.core import core, nerif_match
+from nerif.core import core, nerif_match, nerif_match_string
 
 
 class MyTestCase(unittest.TestCase):
@@ -20,7 +20,7 @@ class MyTestCase(unittest.TestCase):
             "2": "the sky is green",
             "3": "the sky is red",
         }
-        match_result = nerif_match("the truth", test_selection)
+        match_result = nerif_match_string("the truth", test_selection)
 
         self.assertEqual("1", match_result)
         test_selection = {
