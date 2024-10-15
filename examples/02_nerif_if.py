@@ -1,9 +1,9 @@
 from nerif.agent import SimpleChatAgent
-from nerif.core import core
+from nerif.core import nerif
 
 agent = SimpleChatAgent()
 
-if core("the sky is blue"):
+if nerif("the sky is blue"):
     print("True")
 else:
     print("No", end=", ")
