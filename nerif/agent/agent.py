@@ -224,6 +224,7 @@ class SimpleChatAgent:
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
         counter: NerifTokenCounter = None,
+        max_tokens: None | int = None,
     ):
         # Set the proxy URL and API key
         if proxy_url is None or proxy_url == "":
@@ -245,6 +246,7 @@ class SimpleChatAgent:
             {"role": "system", "content": default_prompt},
         ]
         self.counter = counter
+        self.agent_max_tokens = max_tokens
 
     def reset(self, prompt: Optional[str] = None) -> None:
         # Reset the conversation history
@@ -253,21 +255,19 @@ class SimpleChatAgent:
 
         self.messages: List[Any] = [{"role": "system", "content": prompt}]
 
-    def chat(self, message: str, append: bool = False, max_tokens: int = 300) -> str:
+    def chat(
+        self, message: str, append: bool = False, max_tokens: None | int = None
+    ) -> str:
         # Append the user's message to the conversation history
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
 
-        kwargs = {
-            "model": self.model,
-            "temperature": self.temperature,
-            "max_tokens": max_tokens,
-        }
+        req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
         kwargs = {
             "model": self.model,
             "temperature": self.temperature,
-            "max_tokens": max_tokens,
+            "max_tokens": req_max_tokens,
         }
 
         if self.counter is not None:
