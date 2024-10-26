@@ -122,13 +122,10 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+# 2024/10/26 Kept only venv as isort would defaultly skip them
+# https://github.com/PyCQA/isort/blob/7de182933fd50e04a7c47cc8be75a6547754b19c/isort/settings.py#L77
 .venv
-env/
 venv/
-ENV/
-env.bak/
-venv.bak/
 
 # Spyder project settings
 .spyderproject

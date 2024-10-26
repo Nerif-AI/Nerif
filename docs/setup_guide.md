@@ -2,7 +2,7 @@
 
  - locate to the root directory
  - create a new python environment
-   - `python -m venv ENV; ./ENV/Scripts/activate`
+   - `python -m venv venv; ./venv/Scripts/activate`
  - run `pip install -e .` in command lines
  - If you want to setup the environment for api keys instead of manually put it every single time, set up the environmental variables with your open ai api keys
    - in windows you could do `setx OPENAI_API_KEY sk-xxxxxxxxx`
