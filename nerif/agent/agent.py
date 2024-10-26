@@ -449,7 +449,7 @@ class VisionAgent:
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
         counter: Optional[NerifTokenCounter] = None,
-        max_tokens: int | None = None
+        max_tokens: int | None = None,
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -503,10 +503,10 @@ class VisionAgent:
         self.agent_max_tokens = max_tokens
 
     def chat(
-        self, 
-        input: List[Any] = None, 
-        append: bool = False, 
-        max_tokens: int | None = None
+        self,
+        input: List[Any] = None,
+        append: bool = False,
+        max_tokens: int | None = None,
     ) -> str:
         if input is None:
             # combine cache and new message
