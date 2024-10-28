@@ -163,4 +163,5 @@ cython_debug/
 
 
 debug
-
+.vscode
+set_key.sh
