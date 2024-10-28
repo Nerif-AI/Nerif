@@ -28,7 +28,7 @@ class FormatVerifierBase:
             if res is not None:
                 return res
             else:
-                raise ValueError("Cannot convert {} to {}".format(self.cls.__name__))
+                raise ValueError("Cannot convert {} to {}".format(val, self.cls.__name__))
 
 
 class FormatVerifierInt(FormatVerifierBase):

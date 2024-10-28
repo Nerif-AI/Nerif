@@ -25,6 +25,7 @@ def similarity_dist(vec1, vec2, func="cosine"):
     else:
         return np.linalg.norm(vec1 - vec2)
 
+
 def support_logit_mode(model_name):
     import litellm
 
@@ -32,6 +33,7 @@ def support_logit_mode(model_name):
     if "logprob" in response:
         return True
     return False
+
 
 class NerificationBase:
     """
@@ -331,13 +333,31 @@ class Nerif:
         return result
 
     @classmethod
-    def instance(cls, text, max_retry=5, model="gpt-4o", embed_model=NERIF_DEFAULT_EMBEDDING_MODEL, debug=False, counter=None):
-        new_instance = cls(model=model, embed_model=embed_model, debug=debug, counter=counter)
+    def instance(
+        cls,
+        text,
+        max_retry=5,
+        model="gpt-4o",
+        embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+        debug=False,
+        counter=None,
+    ):
+        new_instance = cls(
+            model=model, embed_model=embed_model, debug=debug, counter=counter
+        )
         return new_instance.judge(text, max_retry=max_retry)
 
 
-def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, embed_model=NERIF_DEFAULT_EMBEDDING_MODEL, debug=False, counter=None):
-    return Nerif.instance(text, model=model, embed_model=embed_model, debug=debug, counter=counter)
+def nerif(
+    text,
+    model=NERIF_DEFAULT_LLM_MODEL,
+    embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+    debug=False,
+    counter=None,
+):
+    return Nerif.instance(
+        text, model=model, embed_model=embed_model, debug=debug, counter=counter
+    )
 
 
 class NerifMatchString:
@@ -383,7 +403,6 @@ class NerifMatchString:
             model=embed_model,
             possible_values=choices,
         )
-
 
     def logits_mode(self, text):
         self.logits_agent.temperature = self.temperature
@@ -442,7 +461,6 @@ class NerifMatchString:
                 try_id += 1
                 if result is not None:
                     return result
-
 
         result = self.embedding_mode(text)
         return result
