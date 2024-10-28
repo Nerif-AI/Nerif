@@ -78,6 +78,11 @@ def get_litellm_embedding(
             "model": model,
             "input": messages,
         }
+    elif model.startswith("ollama"):
+        kargs = {
+            "model": model,
+            "input": messages,
+        }
 
     response = litellm.embedding(**kargs)
 
@@ -127,6 +132,11 @@ def get_litellm_response(
             "base_url": base_url,
         }
     elif model.startswith("openrouter"):
+        kargs = {
+            "model": model,
+            "messages": messages,
+        }
+    elif model.startswith("ollama"):
         kargs = {
             "model": model,
             "messages": messages,
