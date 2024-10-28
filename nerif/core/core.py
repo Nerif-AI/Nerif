@@ -217,7 +217,13 @@ class Nerif:
     """
 
     def __init__(
-        self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, counter=None, debug=False
+        self,
+        model=NERIF_DEFAULT_LLM_MODEL,
+        embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+        enable_embed_mode=True,
+        temperature=0,
+        counter=None,
+        debug=False,
     ):
         self.model = model
         self.prompt = (
@@ -232,8 +238,9 @@ class Nerif:
         self.logits_agent = LogitsAgent(
             model=model, temperature=temperature, counter=counter
         )
-        self.verification = Nerification(counter=counter)
+        self.verification = Nerification(counter=counter, model=embed_model)
         self.debug = debug
+        self.enable_embed_mode = enable_embed_mode
 
         if self.debug:
             print(
@@ -312,9 +319,14 @@ class Nerif:
                 continue
             else:
                 return result
-        # Use embedding mode as fallback
-        result = self.embedding_mode(text)
-        return result
+
+        if self.enable_embed_mode:
+            # Use embedding mode as fallback
+            result = self.embedding_mode(text)
+            return result
+        raise RuntimeError(
+            "Cannot find the best match. Please enable embed mode and retry."
+        )
 
     @classmethod
     def instance(cls, text, max_retry=5, model="gpt-4o", debug=False, counter=None):
@@ -331,6 +343,8 @@ class NerifMatchString:
         self,
         choices: List[str],
         model=NERIF_DEFAULT_LLM_MODEL,
+        embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+        enable_embed_mode=True,
         temperature=0,
         counter=None,
     ):
@@ -360,9 +374,12 @@ class NerifMatchString:
             model=model, temperature=temperature, counter=counter
         )
         self.verification = NerificationInt(
-            possible_values=[x for x in range(0, len(choices))], counter=counter
+            model=embed_model,
+            possible_values=[x for x in range(0, len(choices))],
+            counter=counter,
         )
         self.instruction_verification = NerificationString(
+            model=embed_model,
             possible_values=choices,
         )
 
@@ -422,22 +439,63 @@ class NerifMatchString:
             if result is not None:
                 return result
 
-        result = self.embedding_mode(text)
-        return result
+        if self.embedding_mode:
+            result = self.embedding_mode(text)
+            return result
+        raise RuntimeError(
+            "Cannot find the best match. Please enable embed mode and retry."
+        )
 
     @classmethod
     def instance(
-        cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL, counter=None
+        cls,
+        selections,
+        text,
+        max_retry=5,
+        model=NERIF_DEFAULT_LLM_MODEL,
+        embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+        enable_embed_mode=True,
+        counter=None,
     ):
-        new_instance = cls(selections, model=model, counter=counter)
+        new_instance = cls(
+            selections,
+            model=model,
+            embed_model=embed_model,
+            enable_embed_mode=enable_embed_mode,
+            counter=counter,
+        )
         return new_instance.match(text, max_retry=max_retry)
 
 
 def nerif_match_string(
-    selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=None
+    selections,
+    text,
+    model=NERIF_DEFAULT_LLM_MODEL,
+    embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+    enable_embed_mode=True,
+    counter=None,
 ) -> int:
-    return NerifMatchString.instance(selections, text, model=model, counter=counter)
+    return NerifMatchString.instance(
+        selections,
+        model=model,
+        embed_model=embed_model,
+        enable_embed_mode=enable_embed_mode,
+        counter=counter,
+    )
 
 
-def nerif_match(selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=None) -> int:
-    return NerifMatchString.instance(selections, text, model=model, counter=counter)
+def nerif_match(
+    selections,
+    text,
+    model=NERIF_DEFAULT_LLM_MODEL,
+    embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+    enable_embed_mode=True,
+    counter=None,
+) -> int:
+    return NerifMatchString.instance(
+        selections,
+        model=model,
+        embed_model=embed_model,
+        enable_embed_mode=enable_embed_mode,
+        counter=counter,
+    )
