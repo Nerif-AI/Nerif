@@ -234,6 +234,7 @@ class SimpleChatAgent:
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
         counter: NerifTokenCounter = None,
+        max_tokens: None | int = None,
     ):
         # Set the proxy URL and API key
         if proxy_url is None or proxy_url == "":
@@ -255,6 +256,7 @@ class SimpleChatAgent:
             {"role": "system", "content": default_prompt},
         ]
         self.counter = counter
+        self.agent_max_tokens = max_tokens
 
     def reset(self, prompt: Optional[str] = None) -> None:
         # Reset the conversation history
@@ -263,21 +265,22 @@ class SimpleChatAgent:
 
         self.messages: List[Any] = [{"role": "system", "content": prompt}]
 
-    def chat(self, message: str, append: bool = False, max_tokens: int = 300) -> str:
+    def set_max_tokens(self, max_tokens: None | int = None):
+        self.agent_max_tokens = max_tokens
+
+    def chat(
+        self, message: str, append: bool = False, max_tokens: None | int = None
+    ) -> str:
         # Append the user's message to the conversation history
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
 
-        kwargs = {
-            "model": self.model,
-            "temperature": self.temperature,
-            "max_tokens": max_tokens,
-        }
+        req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
         kwargs = {
             "model": self.model,
             "temperature": self.temperature,
-            "max_tokens": max_tokens,
+            "max_tokens": req_max_tokens,
         }
 
         if self.counter is not None:
@@ -386,6 +389,7 @@ class LogitsAgent:
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
         counter: Optional[NerifTokenCounter] = None,
+        max_tokens: int | None = None,
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -405,14 +409,18 @@ class LogitsAgent:
             {"role": "system", "content": default_prompt},
         ]
         self.counter = counter
+        self.agent_max_tokens = max_tokens
 
     def reset(self):
         self.messages = [{"role": "system", "content": self.default_prompt}]
 
+    def set_max_tokens(self, max_tokens: None | int = None):
+        self.agent_max_tokens = max_tokens
+
     def chat(
         self,
         message: str,
-        max_tokens: int = 300,
+        max_tokens: int | None = None,
         logprobs: bool = True,
         top_logprobs: int = 5,
     ) -> Any:
@@ -420,12 +428,14 @@ class LogitsAgent:
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
 
+        req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
+
         if self.model in OPENAI_MODEL:
             result = get_litellm_response(
                 self.messages,
                 model=self.model,
                 temperature=self.temperature,
-                max_tokens=max_tokens,
+                max_tokens=req_max_tokens,
                 logprobs=logprobs,
                 top_logprobs=top_logprobs,
                 counter=self.counter,
@@ -449,6 +459,7 @@ class VisionAgent:
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
         counter: Optional[NerifTokenCounter] = None,
+        max_tokens: int | None = None,
     ):
         if proxy_url is None or proxy_url == "":
             proxy_url = OPENAI_PROXY_URL
@@ -470,6 +481,7 @@ class VisionAgent:
         self.content_cache = []
         self.cost_count = {"input_token_count": 0, "output_token_count": 0}
         self.couter = counter
+        self.agent_max_tokens = max_tokens
 
     def append_message(self, message_type: MessageType, content: str):
         if message_type == MessageType.IMAGE_PATH:
@@ -497,8 +509,14 @@ class VisionAgent:
         self.messages = [{"role": "system", "content": self.default_prompt}]
         self.content_cache = []
 
+    def set_max_tokens(self, max_tokens: None | int = None):
+        self.agent_max_tokens = max_tokens
+
     def chat(
-        self, input: List[Any] = None, append: bool = False, max_tokens: int = 1000
+        self,
+        input: List[Any] = None,
+        append: bool = False,
+        max_tokens: int | None = None,
     ) -> str:
         if input is None:
             # combine cache and new message
@@ -512,11 +530,13 @@ class VisionAgent:
         }
         self.messages.append(message)
 
+        req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
+
         result = get_litellm_response(
             self.messages,
             model=self.model,
             temperature=self.temperature,
-            max_tokens=max_tokens,
+            max_tokens=req_max_tokens,
             counter=self.couter,
         )
         text_result = result.choices[0].message.content
