@@ -26,6 +26,15 @@ def similarity_dist(vec1, vec2, func="cosine"):
         return np.linalg.norm(vec1 - vec2)
 
 
+def support_logit_mode(model_name):
+    import litellm
+
+    response = litellm.get_supported_openai_params(model=model_name)
+    if "logprob" in response:
+        return True
+    return False
+
+
 class NerificationBase:
     """
     Base class for Nerification.
@@ -217,7 +226,12 @@ class Nerif:
     """
 
     def __init__(
-        self, model=NERIF_DEFAULT_LLM_MODEL, temperature=0, counter=None, debug=False
+        self,
+        model=NERIF_DEFAULT_LLM_MODEL,
+        embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+        temperature=0,
+        counter=None,
+        debug=False,
     ):
         self.model = model
         self.prompt = (
@@ -232,7 +246,7 @@ class Nerif:
         self.logits_agent = LogitsAgent(
             model=model, temperature=temperature, counter=counter
         )
-        self.verification = Nerification(counter=counter)
+        self.verification = Nerification(counter=counter, model=embed_model)
         self.debug = debug
 
         if self.debug:
@@ -303,27 +317,47 @@ class Nerif:
         result = None
 
         # Try logits mode first
-        while try_id < max_retry:
-            result = self.logits_mode(text)
-            try_id += 1
-            if result is None:
-                if self.debug:
-                    print("logits mode failed, {} try".format(try_id))
-                continue
-            else:
-                return result
+        if support_logit_mode(self.model):
+            while try_id < max_retry:
+                result = self.logits_mode(text)
+                try_id += 1
+                if result is None:
+                    if self.debug:
+                        print("logits mode failed, {} try".format(try_id))
+                    continue
+                else:
+                    return result
+
         # Use embedding mode as fallback
         result = self.embedding_mode(text)
         return result
 
     @classmethod
-    def instance(cls, text, max_retry=5, model="gpt-4o", debug=False, counter=None):
-        new_instance = cls(model=model, debug=debug, counter=counter)
+    def instance(
+        cls,
+        text,
+        max_retry=5,
+        model="gpt-4o",
+        embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+        debug=False,
+        counter=None,
+    ):
+        new_instance = cls(
+            model=model, embed_model=embed_model, debug=debug, counter=counter
+        )
         return new_instance.judge(text, max_retry=max_retry)
 
 
-def nerif(text, model=NERIF_DEFAULT_LLM_MODEL, debug=False, counter=None):
-    return Nerif.instance(text, model=model, debug=debug, counter=counter)
+def nerif(
+    text,
+    model=NERIF_DEFAULT_LLM_MODEL,
+    embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+    debug=False,
+    counter=None,
+):
+    return Nerif.instance(
+        text, model=model, embed_model=embed_model, debug=debug, counter=counter
+    )
 
 
 class NerifMatchString:
@@ -331,6 +365,7 @@ class NerifMatchString:
         self,
         choices: List[str],
         model=NERIF_DEFAULT_LLM_MODEL,
+        embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
         temperature=0,
         counter=None,
     ):
@@ -360,9 +395,12 @@ class NerifMatchString:
             model=model, temperature=temperature, counter=counter
         )
         self.verification = NerificationInt(
-            possible_values=[x for x in range(0, len(choices))], counter=counter
+            model=embed_model,
+            possible_values=[x for x in range(0, len(choices))],
+            counter=counter,
         )
         self.instruction_verification = NerificationString(
+            model=embed_model,
             possible_values=choices,
         )
 
@@ -416,28 +454,61 @@ class NerifMatchString:
     def match(self, text, max_retry=3):
         self.agent.temperature = self.temperature
         try_id = 0
-        while try_id < max_retry:
-            result = self.logits_mode(text)
-            try_id += 1
-            if result is not None:
-                return result
+
+        if support_logit_mode(self.model):
+            while try_id < max_retry:
+                result = self.logits_mode(text)
+                try_id += 1
+                if result is not None:
+                    return result
 
         result = self.embedding_mode(text)
         return result
 
     @classmethod
     def instance(
-        cls, selections, text, max_retry=5, model=NERIF_DEFAULT_LLM_MODEL, counter=None
+        cls,
+        selections,
+        text,
+        max_retry=5,
+        model=NERIF_DEFAULT_LLM_MODEL,
+        embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+        counter=None,
     ):
-        new_instance = cls(selections, model=model, counter=counter)
+        new_instance = cls(
+            selections,
+            model=model,
+            embed_model=embed_model,
+            counter=counter,
+        )
         return new_instance.match(text, max_retry=max_retry)
 
 
 def nerif_match_string(
-    selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=None
+    selections,
+    text,
+    model=NERIF_DEFAULT_LLM_MODEL,
+    embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+    counter=None,
 ) -> int:
-    return NerifMatchString.instance(selections, text, model=model, counter=counter)
+    return NerifMatchString.instance(
+        selections,
+        model=model,
+        embed_model=embed_model,
+        counter=counter,
+    )
 
 
-def nerif_match(selections, text, model=NERIF_DEFAULT_LLM_MODEL, counter=None) -> int:
-    return NerifMatchString.instance(selections, text, model=model, counter=counter)
+def nerif_match(
+    selections,
+    text,
+    model=NERIF_DEFAULT_LLM_MODEL,
+    embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
+    counter=None,
+) -> int:
+    return NerifMatchString.instance(
+        selections,
+        model=model,
+        embed_model=embed_model,
+        counter=counter,
+    )
