@@ -49,8 +49,8 @@ class OpenAIResponseParser(ResponseParserBase):
         model_name = response.model
         response_type = response.__class__.__name__
         if response_type == "EmbeddingResponse":
-            requested_tokens = 0
-            completation_tokens = len(response.data[0]["embedding"])
+            requested_tokens = len(response.data[0]["embedding"])
+            completation_tokens = 0
         else:
             usage = response.usage
             requested_tokens = usage.prompt_tokens
