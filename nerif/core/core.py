@@ -1,7 +1,4 @@
-import os
 from typing import Any, List, Optional
-
-import numpy as np
 
 from ..agent import (
     LogitsAgent,
@@ -9,21 +6,11 @@ from ..agent import (
     SimpleChatAgent,
     SimpleEmbeddingAgent,
 )
-
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
-OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
-NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
-NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get(
-    "NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small"
+from .utils import (
+    NERIF_DEFAULT_EMBEDDING_MODEL,
+    NERIF_DEFAULT_LLM_MODEL,
+    similarity_dist,
 )
-
-
-def similarity_dist(vec1, vec2, func="cosine"):
-    if func == "cosine":
-        return 1 - (vec1 @ vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
-    else:
-        return np.linalg.norm(vec1 - vec2)
 
 
 def support_logit_mode(model_name):
@@ -39,6 +26,26 @@ class NerificationBase:
     """
     Base class for Nerification.
     This class is used to verify the result of the Nerif.
+    This class provides base functionality for verifying and matching values against a predefined set of possible values.
+
+    Attributes:
+        original_options (List[Any]): Original list of possible values before conversion
+        possible (List[str]): List of possible values converted to lowercase strings
+        embedding (SimpleEmbeddingAgent): Agent used for generating embeddings
+        possible_embed (List): List of embeddings for each possible value
+
+    Methods:
+        convert(val: Any) -> str:
+            Converts a value to lowercase string format
+
+        verify(val: Any) -> bool:
+            Checks if a value exists in the possible values list
+
+        simple_fit(val: Any):
+            Uses embeddings to find the closest matching possible value
+
+        force_fit(val: Any, similarity="cosine"):
+            Uses embeddings to find the closest matching possible value
     """
 
     def __init__(
@@ -63,10 +70,6 @@ class NerificationBase:
 
         self.embedding = SimpleEmbeddingAgent(model=model, counter=counter)
         self.possible_embed = []
-
-        # Embed the possible value and the possible instruction
-        for index in range(len(self.possible)):
-            self.possible_embed.append(self.embedding.encode(self.possible[index]))
 
     def convert(self, val: Any):
         """
@@ -99,6 +102,10 @@ class NerificationBase:
         """
         Use the embedding model to find the best fit in the possible_values.
         """
+        if self.possible_embed == []:
+            # Embed the possible value and the possible instruction
+            for index in range(len(self.possible)):
+                self.possible_embed.append(self.embedding.encode(self.possible[index]))
         text_embed = self.embedding.encode(self.convert(val))
         min_dist = similarity_dist(text_embed, self.possible_embed[0], similarity)
         min_id = 0
@@ -211,7 +218,9 @@ class Nerif:
 
     Attributes:
         model: str = NERIF_DEFAULT_LLM_MODEL
+        embed_model: str = NERIF_DEFAULT_EMBEDDING_MODE
         temperature: float = 0
+        counter: Optional[NerifTokenCounter] = None
         debug: bool = False
 
     Methods:
@@ -361,6 +370,30 @@ def nerif(
 
 
 class NerifMatchString:
+    """
+    This class is used to match the best choice from a list of options.
+    It uses two modes: logits mode and embedding mode.
+    Logits mode is faster, but less accurate. Fetch top logprobs from the logits.
+    Embedding mode is slower, but more accurate. Embed the text and compare with the possible values.
+
+    Attributes:
+        choices: List[str]
+        model: str = NERIF_DEFAULT_LLM_MODEL
+        embed_model: str = NERIF_DEFAULT_EMBEDDING_MODEL
+        temperature: float = 0
+        counter: Optional[NerifTokenCounter] = None
+
+    Methods:
+        logits_mode(text: str) -> int:
+            Match the best choice using logits mode.
+        embedding_mode(text: str) -> int:
+            Match the best choice using embedding mode.
+        match(text: str, max_retry: int = 3) -> int:
+            Match the best choice using logits mode first, if failed, use embedding mode as fallback.
+        instance(choices: List[str], text: str, max_retry: int = 5, model: str = NERIF_DEFAULT_LLM_MODEL, embed_model: str = NERIF_DEFAULT_EMBEDDING_MODEL, debug: bool = False, counter: Optional[NerifTokenCounter] = None) -> int:
+            Create a new instance and match the best choice.
+    """
+
     def __init__(
         self,
         choices: List[str],
@@ -493,6 +526,7 @@ def nerif_match_string(
 ) -> int:
     return NerifMatchString.instance(
         selections,
+        text=text,
         model=model,
         embed_model=embed_model,
         counter=counter,
@@ -508,6 +542,7 @@ def nerif_match(
 ) -> int:
     return NerifMatchString.instance(
         selections,
+        text=text,
         model=model,
         embed_model=embed_model,
         counter=counter,
