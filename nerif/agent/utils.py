@@ -35,12 +35,21 @@ OPENAI_EMBEDDING_MODEL: List[str] = [
 ]
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
 OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
+OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 OR_SITE_URL = os.environ.get("OR_SITE_URL")
 OR_APP_NAME = os.environ.get("OR_APP_NAME")
+
+OLLAMA_URL = os.environ.get("OLLAMA_URL")
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY")
+
+VLLM_URL = os.environ.get("VLLM_URL")
+VLLM_API_KEY = os.environ.get("VLLM_API_KEY")
+
+SLLM_URL = os.environ.get("SLLM_URL")
+SLLM_API_KEY = os.environ.get("SLLM_API_KEY")
 
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
 NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get(
@@ -122,7 +131,6 @@ def get_litellm_response(
     Returns:
     - list: A list of generated text responses if messages is a list, otherwise a single text response.
     """
-    print(model)
     if model in OPENAI_MODEL:
         if api_key is None or api_key == "":
             api_key = OPENAI_API_KEY

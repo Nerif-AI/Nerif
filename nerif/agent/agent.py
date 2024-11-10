@@ -5,9 +5,7 @@ from .token_counter import NerifTokenCounter
 from .utils import (
     LOGGER,
     NERIF_DEFAULT_LLM_MODEL,
-    OPENAI_API_KEY,
     OPENAI_MODEL,
-    OPENAI_PROXY_URL,
     MessageType,
     get_litellm_embedding,
     get_litellm_response,
@@ -22,8 +20,6 @@ class SimpleChatAgent:
     It uses OpenAI's GPT models to generate responses to user inputs.
 
     Attributes:
-        proxy_url (str): The URL of the proxy server for API requests.
-        api_key (str): The API key for authentication.
         model (str): The name of the GPT model to use.
         default_prompt (str): The default system prompt for the chat.
         temperature (float): The temperature setting for response generation.
@@ -38,27 +34,15 @@ class SimpleChatAgent:
 
     def __init__(
         self,
-        proxy_url: Optional[str] = None,
-        api_key: Optional[str] = None,
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
         counter: NerifTokenCounter = None,
         max_tokens: None | int = None,
     ):
-        # Set the proxy URL and API key
-        if proxy_url is None or proxy_url == "":
-            proxy_url = OPENAI_PROXY_URL
-        elif proxy_url[-1] == "/":
-            proxy_url = proxy_url[:-1]
-        if api_key is None or api_key == "":
-            api_key = OPENAI_API_KEY
-
         # Set the model, temperature, proxy URL, and API key
         self.model = model
         self.temperature = temperature
-        self.proxy_url = proxy_url
-        self.api_key = api_key
 
         # Set the default prompt and initialize the conversation history
         self.default_prompt = default_prompt
@@ -97,25 +81,17 @@ class SimpleChatAgent:
             kwargs["counter"] = self.counter
 
         if self.model.startswith("ollama"):
-            # ??? why is here a model_name never used
-            # Model name is used to count tokens(price) @2024-10-05
-            # model_name = self.model.split("/")[1]
-
             LOGGER.debug("requested with message: %s", self.messages)
             LOGGER.debug("arguments of request: %s", kwargs)
-
             result = get_ollama_response(self.messages, **kwargs)
         elif self.model.startswith("openrouter"):
             LOGGER.debug("requested with message: %s", self.messages)
             LOGGER.debug("arguments of request: %s", kwargs)
-
             result = get_litellm_response(self.messages, **kwargs)
         elif self.model in OPENAI_MODEL:
             LOGGER.debug("requested with message: %s", self.messages)
             LOGGER.debug("arguments of request: %s", kwargs)
-
             result = get_litellm_response(self.messages, **kwargs)
-
         else:
             raise ValueError(f"Model {self.model} not supported")
 
@@ -132,8 +108,6 @@ class SimpleEmbeddingAgent:
     A simple agent for embedding text.
 
     Attributes:
-        proxy_url (str): The URL of the proxy server for API requests.
-        api_key (str): The API key for authentication.
         model (str): The name of the embedding model to use.
         counter (NerifTokenCounter): Token counter instance.
 
@@ -143,29 +117,17 @@ class SimpleEmbeddingAgent:
 
     def __init__(
         self,
-        proxy_url: Optional[str] = None,
-        # base_url: Optional[str] = None,
-        api_key: Optional[str] = None,
         model: str = "text-embedding-3-small",
         counter: Optional[NerifTokenCounter] = None,
     ):
-        if proxy_url is None or proxy_url == "":
-            proxy_url = OPENAI_PROXY_URL
-        elif proxy_url[-1] == "/":
-            proxy_url = proxy_url[:-1]
-        if api_key is None or api_key == "":
-            api_key = OPENAI_API_KEY
 
         self.model = model
-        self.proxy_url = proxy_url
-        self.api_key = api_key
         self.counter = counter
 
     def encode(self, string: str) -> List[float]:
         result = get_litellm_embedding(
             messages=string,
             model=self.model,
-            api_key=self.api_key,
             counter=self.counter,
         )
 
@@ -177,8 +139,6 @@ class LogitsAgent:
     A simple agent for fetching logits from a model.
 
     Attributes:
-        proxy_url (str): The URL of the proxy server for API requests.
-        api_key (str): The API key for authentication.
         model (str): The name of the model to use.
         default_prompt (str): The default system prompt for the chat.
         temperature (float): The temperature setting for response generation.
@@ -193,24 +153,13 @@ class LogitsAgent:
 
     def __init__(
         self,
-        proxy_url: Optional[str] = None,
-        api_key: Optional[str] = None,
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
         counter: Optional[NerifTokenCounter] = None,
         max_tokens: int | None = None,
     ):
-        if proxy_url is None or proxy_url == "":
-            proxy_url = OPENAI_PROXY_URL
-        elif proxy_url[-1] == "/":
-            proxy_url = proxy_url[:-1]
-        if api_key is None or api_key == "":
-            api_key = OPENAI_API_KEY
-
         self.model = model
-        self.proxy_url = proxy_url
-        self.api_key = api_key
         self.temperature = temperature
 
         # Set the default prompt and initialize the conversation history
@@ -263,8 +212,6 @@ class VisionAgent:
     It uses OpenAI's GPT-4 Vision models to generate responses to user inputs that include images.
 
     Attributes:
-        proxy_url (str): The URL of the proxy server for API requests.
-        api_key (str): The API key for authentication.
         model (str): The name of the GPT model to use.
         default_prompt (str): The default system prompt for the chat.
         temperature (float): The temperature setting for response generation.
@@ -279,24 +226,13 @@ class VisionAgent:
 
     def __init__(
         self,
-        proxy_url: Optional[str] = None,
-        api_key: Optional[str] = None,
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
         counter: Optional[NerifTokenCounter] = None,
         max_tokens: int | None = None,
     ):
-        if proxy_url is None or proxy_url == "":
-            proxy_url = OPENAI_PROXY_URL
-        elif proxy_url[-1] == "/":
-            proxy_url = proxy_url[:-1]
-        if api_key is None or api_key == "":
-            api_key = OPENAI_API_KEY
-
         self.model = model
-        self.proxy_url = proxy_url
-        self.api_key = api_key
         self.temperature = temperature
 
         # Set the default prompt and initialize the conversation history
