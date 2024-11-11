@@ -28,9 +28,7 @@ class MyTestCase(unittest.TestCase):
             "adduser": "add a new user on my server",
             "reservation": "make a reservation for the server",
         }
-        match_result = nerif_match(
-            "I wanna use the server for AI training tonight", test_selection
-        )
+        match_result = nerif_match("I wanna use the server for AI training tonight", test_selection)
 
         self.assertEqual("reservation", match_result)
 

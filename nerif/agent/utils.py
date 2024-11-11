@@ -35,17 +35,23 @@ OPENAI_EMBEDDING_MODEL: List[str] = [
 ]
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
 OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 OR_SITE_URL = os.environ.get("OR_SITE_URL")
 OR_APP_NAME = os.environ.get("OR_APP_NAME")
 
+OLLAMA_URL = os.environ.get("OLLAMA_URL")
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY")
+
+VLLM_URL = os.environ.get("VLLM_URL")
+VLLM_API_KEY = os.environ.get("VLLM_API_KEY")
+
+SLLM_URL = os.environ.get("SLLM_URL")
+SLLM_API_KEY = os.environ.get("SLLM_API_KEY")
+
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
-NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get(
-    "NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small"
-)
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
 LOGGER = logging.getLogger("Nerif")
 

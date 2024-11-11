@@ -25,10 +25,12 @@ class TestTokenCounter(unittest.TestCase):
 
         self.assertEqual(len(counter.model_token.model_cost), 1)
         self.assertGreater(
-            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].request, 0
+            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].request,
+            0,
         )
         self.assertGreater(
-            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].response, 0
+            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].response,
+            0,
         )
 
     def test_counting_embedding_raw(self):
@@ -84,17 +86,11 @@ class TestTokenCounter(unittest.TestCase):
     def test_set_parser(self):
         counter = NerifTokenCounter()
         counter.set_parser_based_on_model("openrouter/openai/gpt-4o-2024-08-06")
-        self.assertEqual(
-            counter.response_parser.__class__.__name__, "OpenAIResponseParser"
-        )
+        self.assertEqual(counter.response_parser.__class__.__name__, "OpenAIResponseParser")
         counter.set_parser_based_on_model("ollama/llama3.1")
-        self.assertEqual(
-            counter.response_parser.__class__.__name__, "OllamaResponseParser"
-        )
+        self.assertEqual(counter.response_parser.__class__.__name__, "OllamaResponseParser")
         counter.set_parser_based_on_model("openrouter/meta/llama3.1")
-        self.assertEqual(
-            counter.response_parser.__class__.__name__, "OpenAIResponseParser"
-        )
+        self.assertEqual(counter.response_parser.__class__.__name__, "OpenAIResponseParser")
 
 
 if __name__ == "__main__":
