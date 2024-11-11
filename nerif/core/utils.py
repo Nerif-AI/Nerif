@@ -8,7 +8,6 @@ OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
 NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
-
 def similarity_dist(vec1, vec2, func="cosine"):
     if type(vec1) is list:
         vec1 = np.array(vec1)

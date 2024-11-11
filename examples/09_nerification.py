@@ -13,6 +13,7 @@ print(nerification.force_fit("true"))
 
 nerification_int = NerificationInt(model="text-embedding-3-large", possible_values=[1, 233, 343])
 
+
 print(nerification_int.simple_fit(1))
 # result: 1
 print(nerification_int.force_fit(1))
