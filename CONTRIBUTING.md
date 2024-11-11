@@ -1,5 +1,12 @@
 # Contributing to Nerif
 
+## Table of Contents
+
+- [Contributors](#contributors)
+- [Check Code Format](#check-code-format)
+- [Commit Message Guidelines](#commit-message-guidelines)
+- [Pull Requests](#pull-requests)
+
 ## Contributors
 
 Nerif is currently maintained by the following contributors:
