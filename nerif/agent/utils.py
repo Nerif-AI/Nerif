@@ -36,7 +36,6 @@ OPENAI_EMBEDDING_MODEL: List[str] = [
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
-OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 OR_SITE_URL = os.environ.get("OR_SITE_URL")

@@ -40,7 +40,7 @@ class SimpleChatAgent:
         counter: NerifTokenCounter = None,
         max_tokens: None | int = None,
     ):
-        # Set the model, temperature, proxy URL, and API key
+        # Set the model, temperature
         self.model = model
         self.temperature = temperature
 
@@ -120,7 +120,6 @@ class SimpleEmbeddingAgent:
         model: str = "text-embedding-3-small",
         counter: Optional[NerifTokenCounter] = None,
     ):
-
         self.model = model
         self.counter = counter
 
