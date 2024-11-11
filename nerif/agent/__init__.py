@@ -1,4 +1,9 @@
-from .agent import LogitsAgent, SimpleChatAgent, SimpleEmbeddingAgent, VisionAgent
+from .agent import (
+    LogitsAgent,
+    SimpleChatAgent,
+    SimpleEmbeddingAgent,
+    VisionAgent,
+)
 from .token_counter import NerifTokenCounter
 from .utils import (
     MessageType,

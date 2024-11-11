@@ -51,9 +51,7 @@ SLLM_URL = os.environ.get("SLLM_URL")
 SLLM_API_KEY = os.environ.get("SLLM_API_KEY")
 
 NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
-NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get(
-    "NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small"
-)
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
 LOGGER = logging.getLogger("Nerif")
 

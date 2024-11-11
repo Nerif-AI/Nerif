@@ -62,9 +62,7 @@ class SimpleChatAgent:
     def set_max_tokens(self, max_tokens: None | int = None):
         self.agent_max_tokens = max_tokens
 
-    def chat(
-        self, message: str, append: bool = False, max_tokens: None | int = None
-    ) -> str:
+    def chat(self, message: str, append: bool = False, max_tokens: None | int = None) -> str:
         # Append the user's message to the conversation history
         new_message = {"role": "user", "content": message}
         self.messages.append(new_message)
@@ -247,13 +245,9 @@ class VisionAgent:
     def append_message(self, message_type: MessageType, content: str):
         if message_type == MessageType.IMAGE_PATH:
             content = f"data:image/jpeg;base64,{base64.b64encode(open(content, 'rb').read()).decode('utf-8')}"
-            self.content_cache.append(
-                {"type": "image_url", "image_url": {"url": content}}
-            )
+            self.content_cache.append({"type": "image_url", "image_url": {"url": content}})
         elif message_type == MessageType.IMAGE_URL:
-            self.content_cache.append(
-                {"type": "image_url", "image_url": {"url": content}}
-            )
+            self.content_cache.append({"type": "image_url", "image_url": {"url": content}})
         elif message_type == MessageType.IMAGE_BASE64:
             self.content_cache.append(
                 {

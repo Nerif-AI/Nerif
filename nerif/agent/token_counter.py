@@ -33,7 +33,11 @@ class NerifTokenConsume:
 
     def __repr__(self) -> str:
         table = PrettyTable()
-        table.field_names = ["model name", "requested tokens", "response tokens"]
+        table.field_names = [
+            "model name",
+            "requested tokens",
+            "response tokens",
+        ]
         for key, value in self.model_cost.items():
             table.add_row([key, value.request, value.response])
         return table.get_string()

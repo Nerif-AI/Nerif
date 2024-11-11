@@ -249,12 +249,8 @@ class Nerif:
             "Only answer with 'True' or 'False'."
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(
-            model=model, temperature=temperature, counter=counter
-        )
-        self.logits_agent = LogitsAgent(
-            model=model, temperature=temperature, counter=counter
-        )
+        self.agent = SimpleChatAgent(model=model, temperature=temperature, counter=counter)
+        self.logits_agent = LogitsAgent(model=model, temperature=temperature, counter=counter)
         self.verification = Nerification(counter=counter, model=embed_model)
         self.debug = debug
 
@@ -281,15 +277,10 @@ class Nerif:
         if not (hasattr(response, "choices") and len(response.choices) > 0):
             return None
         # if choices doesn't have no logprobs, raise an exception
-        if (
-            not hasattr(response.choices[0], "logprobs")
-            or response.choices[0].logprobs is None
-        ):
+        if not hasattr(response.choices[0], "logprobs") or response.choices[0].logprobs is None:
             return None
         logprobs = response.choices[0].logprobs["content"][0]
-        sorted_logprobs = sorted(
-            logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True
-        )
+        sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
         # Try to find the most likely logprob
         for index in range(len(sorted_logprobs)):
             if self.debug:
@@ -351,9 +342,7 @@ class Nerif:
         debug=False,
         counter=None,
     ):
-        new_instance = cls(
-            model=model, embed_model=embed_model, debug=debug, counter=counter
-        )
+        new_instance = cls(model=model, embed_model=embed_model, debug=debug, counter=counter)
         return new_instance.judge(text, max_retry=max_retry)
 
 
@@ -364,9 +353,7 @@ def nerif(
     debug=False,
     counter=None,
 ):
-    return Nerif.instance(
-        text, model=model, embed_model=embed_model, debug=debug, counter=counter
-    )
+    return Nerif.instance(text, model=model, embed_model=embed_model, debug=debug, counter=counter)
 
 
 class NerifMatchString:
@@ -417,16 +404,11 @@ class NerifMatchString:
         self.prompt += "Now the question is:\n"
         self.prompt += "<question>\n"
         self.prompt += (
-            "Choose the best choice from the following options.\n"
-            "Only give me the choice ID, only a number: "
+            "Choose the best choice from the following options.\n" "Only give me the choice ID, only a number: "
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(
-            model=model, temperature=temperature, counter=counter
-        )
-        self.logits_agent = LogitsAgent(
-            model=model, temperature=temperature, counter=counter
-        )
+        self.agent = SimpleChatAgent(model=model, temperature=temperature, counter=counter)
+        self.logits_agent = LogitsAgent(model=model, temperature=temperature, counter=counter)
         self.verification = NerificationInt(
             model=embed_model,
             possible_values=[x for x in range(0, len(choices))],
@@ -447,15 +429,10 @@ class NerifMatchString:
         # Fetch the logprobs of the logits
         if not (hasattr(response, "choices") and len(response.choices) > 0):
             return None
-        if (
-            not hasattr(response.choices[0], "logprobs")
-            or response.choices[0].logprobs is None
-        ):
+        if not hasattr(response.choices[0], "logprobs") or response.choices[0].logprobs is None:
             return None
         logprobs = response.choices[0].logprobs["content"][0]
-        sorted_logprobs = sorted(
-            logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True
-        )
+        sorted_logprobs = sorted(logprobs["top_logprobs"], key=lambda x: x["logprob"], reverse=True)
         # Try to find the most likely logprob
         for index in range(len(sorted_logprobs)):
             simple_fit = self.verification.simple_fit(sorted_logprobs[index]["token"])
