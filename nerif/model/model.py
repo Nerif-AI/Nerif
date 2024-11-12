@@ -10,6 +10,8 @@ from ..utils import (
     get_litellm_embedding,
     get_litellm_response,
     get_ollama_response,
+    get_sllm_response,
+    get_vllm_response,
 )
 
 
@@ -78,18 +80,19 @@ class SimpleChatModel:
         if self.counter is not None:
             kwargs["counter"] = self.counter
 
-        if self.model.startswith("ollama"):
-            LOGGER.debug("requested with message: %s", self.messages)
-            LOGGER.debug("arguments of request: %s", kwargs)
-            result = get_ollama_response(self.messages, **kwargs)
+        LOGGER.debug("requested with message: %s", self.messages)
+        LOGGER.debug("arguments of request: %s", kwargs)
+
+        if self.model in OPENAI_MODEL:
+            result = get_litellm_response(self.messages, **kwargs)
         elif self.model.startswith("openrouter"):
-            LOGGER.debug("requested with message: %s", self.messages)
-            LOGGER.debug("arguments of request: %s", kwargs)
             result = get_litellm_response(self.messages, **kwargs)
-        elif self.model in OPENAI_MODEL:
-            LOGGER.debug("requested with message: %s", self.messages)
-            LOGGER.debug("arguments of request: %s", kwargs)
-            result = get_litellm_response(self.messages, **kwargs)
+        elif self.model.startswith("ollama"):
+            result = get_ollama_response(self.messages, **kwargs)
+        elif self.model.startswith("vllm"):
+            result = get_vllm_response(self.messages, **kwargs)
+        elif self.model.startswith("sllm"):
+            result = get_sllm_response(self.messages, **kwargs)
         else:
             raise ValueError(f"Model {self.model} not supported")
 

@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Union
 
 import litellm
 import numpy as np
+from openai import OpenAI
 
 from .token_counter import NerifTokenCounter
 
@@ -128,7 +129,7 @@ def get_litellm_response(
     messages: List[Any],
     model: str = NERIF_DEFAULT_LLM_MODEL,
     temperature: float = 0,
-    max_tokens: int = 300,
+    max_tokens: int | None = None,
     stream: bool = False,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
@@ -151,7 +152,7 @@ def get_litellm_response(
     Returns:
     - list: A list of generated text responses if messages is a list, otherwise a single text response.
     """
-    # print(model)
+
     if model in OPENAI_MODEL:
         if api_key is None or api_key == "":
             api_key = OPENAI_API_KEY
@@ -169,6 +170,16 @@ def get_litellm_response(
             "messages": messages,
         }
     elif model.startswith("ollama"):
+        kargs = {
+            "model": model,
+            "messages": messages,
+        }
+    elif model.startswith("vllm"):
+        kargs = {
+            "model": model,
+            "messages": messages,
+        }
+    elif model.startswith("sllm"):
         kargs = {
             "model": model,
             "messages": messages,
@@ -194,20 +205,20 @@ def get_litellm_response(
 
 
 def get_ollama_response(
-    prompt: Union[str, List[str]],
-    url: str = "http://localhost:11434/v1/",
+    messages: List[Any],
+    url: str = OLLAMA_URL,
     model: str = "llama3.1",
-    max_tokens: int = 300,
+    max_tokens: int | None = None,
     temperature: float = 0,
     stream: bool = False,
-    api_key: Optional[str] = "ollama",
+    api_key: Optional[str] = None,
     counter: Optional[NerifTokenCounter] = None,
 ) -> Union[str, List[str]]:
     """
     Get a text response from an Ollama model.
 
     Parameters:
-    - prompt (str or list): The input prompt(s) for the model.
+    - messages (str or list): The input messages for the model.
     - url (str): The URL of the Ollama API. Default is "http://localhost:11434/api/generate".
     - model (str): The name of the Ollama model. Default is "llama3.1".
     - max_tokens (int): The maximum number of tokens to generate in the response. Default is 300.
@@ -221,15 +232,132 @@ def get_ollama_response(
     """
 
     # todo: support batch ollama inference
+    if url is None or url == "":
+        # default ollama url
+        url = "http://localhost:11434/v1/"
 
     response = get_litellm_response(
-        prompt,
+        messages,
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
         stream=stream,
         api_key=api_key,
         base_url=url,
+    )
+
+    if counter is not None:
+        counter.set_parser_based_on_model(model)
+        counter.count_from_response(response)
+
+    return response
+
+
+def get_vllm_response(
+    messages: List[Any],
+    url: str = VLLM_URL,
+    model: str = "llama3.1",
+    max_tokens: int | None = None,
+    temperature: float = 0,
+    stream: bool = False,
+    api_key: Optional[str] = None,
+    counter: Optional[NerifTokenCounter] = None,
+) -> Union[str, List[str]]:
+    """
+    Get a text response from a vLLM model.
+
+    Parameters:
+    - messages (str or list): The input messages for the model.
+    - url (str): The URL of the vLLM API. Default is "http://localhost:8000/v1".
+    - model (str): The name of the vLLM model. Default is "llama3.1".
+    - max_tokens (int): The maximum number of tokens to generate in the response. Default is 300.
+    - temperature (float): The temperature setting for response generation. Default is 0.
+    - stream (bool): Whether to stream the response. Default is False.
+    - api_key (str): The API key for accessing the vLLM API. Default is None.
+    - batch_size (int): The number of predictions to make in a single request. Default is 1.
+
+    Returns:
+    - str or list: The generated text response(s).
+    """
+
+    # todo: support batch ollama inference
+    if url is None or url == "":
+        # default vllm url
+        url = "http://localhost:8000/v1"
+    if api_key is None or api_key == "":
+        # default vllm api key from vllm document example
+        api_key = "token-abc123"
+
+    model = "/".join(model.split("/")[1:])
+
+    client = OpenAI(
+        base_url=url,
+        api_key=api_key,
+    )
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        stream=stream,
+    )
+
+    if counter is not None:
+        counter.set_parser_based_on_model(model)
+        counter.count_from_response(response)
+
+    return response
+
+
+def get_sllm_response(
+    messages: List[Any],
+    url: str = SLLM_URL,
+    model: str = "llama3.1",
+    max_tokens: int | None = None,
+    temperature: float = 0,
+    stream: bool = False,
+    api_key: Optional[str] = None,
+    counter: Optional[NerifTokenCounter] = None,
+) -> Union[str, List[str]]:
+    """
+    Get a text response from an Ollama model.
+
+    Parameters:
+    - messages (str or list): The input messages for the model.
+    - url (str): The URL of the SLLM API. Default is "http://localhost:8000/v1".
+    - model (str): The name of the SLLM model. Default is "llama3.1".
+    - max_tokens (int): The maximum number of tokens to generate in the response. Default is 300.
+    - temperature (float): The temperature setting for response generation. Default is 0.
+    - stream (bool): Whether to stream the response. Default is False.
+    - api_key (str): The API key for accessing the SLLM API. Default is None.
+    - batch_size (int): The number of predictions to make in a single request. Default is 1.
+
+    Returns:
+    - str or list: The generated text response(s).
+    """
+
+    # todo: support batch ollama inference
+    if url is None or url == "":
+        # default vllm url
+        url = "http://localhost:8343/v1"
+    if api_key is None or api_key == "":
+        # default vllm api key from vllm document example
+        api_key = "token-abc123"
+
+    model = "/".join(model.split("/")[1:])
+
+    client = OpenAI(
+        base_url=url,
+        api_key=api_key,
+    )
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        stream=stream,
     )
 
     if counter is not None:
