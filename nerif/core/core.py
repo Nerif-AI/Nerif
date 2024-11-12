@@ -1,21 +1,12 @@
 from typing import Any, List, Optional
 
-from ..agent import (
-    LogitsAgent,
-    NerifTokenCounter,
-    SimpleChatAgent,
-    SimpleEmbeddingAgent,
-)
-from .utils import (
-    NERIF_DEFAULT_EMBEDDING_MODEL,
-    NERIF_DEFAULT_LLM_MODEL,
-    similarity_dist,
-)
+import litellm
+
+from ..agent import LogitsAgent, NerifTokenCounter, SimpleChatAgent, SimpleEmbeddingAgent
+from .utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, similarity_dist
 
 
 def support_logit_mode(model_name):
-    import litellm
-
     response = litellm.get_supported_openai_params(model=model_name)
     if "logprob" in response:
         return True
