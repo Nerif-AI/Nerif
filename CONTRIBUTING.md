@@ -18,13 +18,22 @@ Nerif is currently maintained by the following contributors:
 ## Check Code Format
 
 ```bash
-pip install ruff
+pip install ruff isort
+
+# sort import
+isort .
 
 # Check code format
 ruff check . --select I --fix
 
 #Run code format
 ruff format
+```
+
+You can also use the script `scripts/format.sh` to format the code.
+
+```bash
+bash ./scripts/format.sh
 ```
 
 ## Commit Message Guidelines
