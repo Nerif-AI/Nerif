@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nerif"
-version = "0.8.1"
+version = "0.9.0"
 description = "LLM powered Python"
 readme = "README.md"
 authors = [{ name = "Chivier Humber" }]
@@ -36,7 +36,7 @@ dev = ["bumpver", "ruff", "pip-tools", "pytest", "ipython", "isort"]
 Homepage = "https://github.com/Nerif-AI/nerif"
 
 [tool.bumpver]
-current_version = "0.8.1"
+current_version = "0.9.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "Bump version {old_version} -> {new_version}"
 commit = true
