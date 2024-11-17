@@ -3,8 +3,8 @@ import unittest
 
 from litellm import completion, embedding
 
-from nerif.agent import NerifTokenCounter, SimpleChatAgent, SimpleEmbeddingAgent
 from nerif.core import nerif
+from nerif.model import NerifTokenCounter, SimpleChatModel, SimpleEmbeddingModel
 
 pretty_printer = pprint.PrettyPrinter()
 
@@ -62,13 +62,13 @@ class TestTokenCounter(unittest.TestCase):
 
     def test_couting_agent(self):
         counter = NerifTokenCounter()
-        chat_agent = SimpleChatAgent(counter=counter)
-        embedding_agent = SimpleEmbeddingAgent(counter=counter)
+        chat_agent = SimpleChatModel(counter=counter)
+        embedding_agent = SimpleEmbeddingModel(counter=counter)
 
         _ = chat_agent.chat("Which mobile suit is the most powerful one in Z Gundam.")
         self.assertEqual(len(counter.model_token.model_cost), 1)
 
-        _ = embedding_agent.encode("Hello world")
+        _ = embedding_agent.embed("Hello world")
         self.assertEqual(len(counter.model_token.model_cost), 2)
 
         _ = chat_agent.chat("Which mobile suit is the less powerful in Gundam NT")

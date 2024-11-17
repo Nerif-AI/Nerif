@@ -1,4 +1,4 @@
-from nerif.core import (
+from nerif.utils import (
     FormatVerifierFloat,
     FormatVerifierHumanReadableList,
     FormatVerifierInt,

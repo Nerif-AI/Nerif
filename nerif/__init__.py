@@ -1,3 +1,3 @@
-from . import agent, core
+from . import core, model
 
-__all__ = ["agent", "core"]
+__all__ = ["model", "core"]
