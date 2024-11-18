@@ -2,8 +2,8 @@ from typing import Any, List, Optional
 
 import litellm
 
-from ..model import LogitsChatModel, NerifTokenCounter, SimpleChatModel, SimpleEmbeddingModel
-from ..utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, similarity_dist
+from ..model import LogitsChatModel, SimpleChatModel, SimpleEmbeddingModel
+from ..utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, similarity_dist, NerifTokenCounter
 
 
 def support_logit_mode(model_name):
@@ -194,10 +194,10 @@ class NerificationInt(NerificationBase):
         return super().verify(val)
 
     def simple_fit(self, val: Any):
-        return super().simple_fit(val)
+        return int(super().simple_fit(val))
 
     def force_fit(self, val: Any, similarity="cosine"):
-        return super().force_fit(val, similarity)
+        return int(super().force_fit(val, similarity))
 
 
 class Nerif:

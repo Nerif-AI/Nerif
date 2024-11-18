@@ -1,4 +1,4 @@
-import nerif.model.model as model
+import nerif.model as model
 import nerif.utils.log as log
 
 log.set_up_logging(out_file="sample.log", mode="w", std=True)
