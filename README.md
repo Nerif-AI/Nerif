@@ -2,17 +2,17 @@
 
 Program with both **Python** and **Natural Language**.
 
-Using Large Language Models (LLMs) can often yield unpredictable results. They may produce excessively polite responses that, while technically correct, don't always align with the context. When faced with uncertainty, LLMs might display human-like confusion, offering detailed explanations of their thought processes instead of clear answers—an approach that isn't always useful for end-users.
+LLMs can be tricky to work with. They sometimes give overly formal responses or get confused when they're unsure, making them challenging to use in real applications.
 
-To tackle these challenges, we're excited to introduce Nerif. This tool seamlessly integrates LLMs with Python programming, aiming to set a new standard in AI-driven development. Our goal is not only to match but potentially surpass existing frameworks like Langchain, Dify, and other leading AI agent programming methodologies.
+That's why we built Nerif - a simple tool that connects LLMs with Python code. We want to make it better than existing tools like Langchain and Dify.
 
-Our objectives with Nerif are clear:
+Nerif helps you:
 
-- Empower developers to harness LLMs in their projects exactly as they envision.
-- Ensure that LLM outputs are properly formatted into programmable types for seamless integration.
-- Introduce innovative metrics like token_cost and pass_rate to help developers refine the quality of their AI agents' prompts.
+- Control exactly how LLMs work in your code
+- Convert LLM responses into usable data formats
+- Track performance with metrics like cost and success rate
 
-By focusing on these key points, we aim to significantly enhance the utility and efficiency of LLMs in programming environments, making them more accessible and effective for developers worldwide.
+Our goal is to make LLMs easier to use for developers, turning complex AI capabilities into practical programming tools.
 
 ## How to install
 
@@ -29,16 +29,17 @@ pip install nerif
 ## QuickStart
 
 ```python
-from nerif.agent import SimpleChatAgent
 from nerif.core import nerif
+from nerif.model import SimpleChatModel
+
+agent = SimpleChatModel()
 
 # Use nerif judge "natural language statement"
 if nerif("the sky is blue"):
     print("True")
 else:
-    print("No", end=", ")
     # Call a simple agent
-    agent = SimpleChatAgent()
+    print("No", end=", ")
     print(agent.chat("what is the color of the sky?"))
 ```
 
