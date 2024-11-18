@@ -26,6 +26,8 @@ from .utils import (
     get_litellm_embedding,
     get_litellm_response,
     get_ollama_response,
+    get_sllm_response,
+    get_vllm_response,
     similarity_dist,
 )
 
@@ -53,6 +55,8 @@ __all__ = [
     "get_litellm_embedding",
     "get_litellm_response",
     "get_ollama_response",
+    "get_sllm_response",
+    "get_vllm_response",
     # environment variables
     "OPENAI_API_BASE",
     "OPENAI_API_KEY",
