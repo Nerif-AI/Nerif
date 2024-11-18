@@ -6,6 +6,7 @@ from typing import Any, List, Optional, Union
 import litellm
 import numpy as np
 from openai import OpenAI
+import numpy as np
 
 from .token_counter import NerifTokenCounter
 
