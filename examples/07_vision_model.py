@@ -1,5 +1,6 @@
 from nerif.model import VisionModel
 from nerif.utils import MessageType
+
 if __name__ == "__main__":
     vision_model = VisionModel(model="openrouter/openai/gpt-4o-2024-08-06")
     vision_model.append_message(

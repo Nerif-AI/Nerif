@@ -3,7 +3,7 @@ from typing import Any, List, Optional
 import litellm
 
 from ..model import LogitsChatModel, SimpleChatModel, SimpleEmbeddingModel
-from ..utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, similarity_dist, NerifTokenCounter
+from ..utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, NerifTokenCounter, similarity_dist
 
 
 def support_logit_mode(model_name):
