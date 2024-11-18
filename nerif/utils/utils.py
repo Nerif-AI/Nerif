@@ -151,7 +151,7 @@ def get_litellm_response(
     Returns:
     - list: A list of generated text responses if messages is a list, otherwise a single text response.
     """
-    print(model)
+    # print(model)
     if model in OPENAI_MODEL:
         if api_key is None or api_key == "":
             api_key = OPENAI_API_KEY
