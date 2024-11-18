@@ -248,7 +248,7 @@ class VisionModel:
     def append_message(self, message_type: MessageType, content: str):
         if message_type == MessageType.IMAGE_PATH:
             content = f"data:image/jpeg;base64,{base64.b64encode(open(content, 'rb').read()).decode('utf-8')}"
-            self.content_cache.append({"type": "image_url", "image_url": {"url": content}})
+            self.content_cache.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{content}"}})
         elif message_type == MessageType.IMAGE_URL:
             self.content_cache.append({"type": "image_url", "image_url": {"url": content}})
         elif message_type == MessageType.IMAGE_BASE64:
