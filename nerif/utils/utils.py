@@ -4,8 +4,8 @@ from enum import Enum, auto
 from typing import Any, List, Optional, Union
 
 import litellm
-from openai import OpenAI
 import numpy as np
+from openai import OpenAI
 
 from .token_counter import NerifTokenCounter
 
