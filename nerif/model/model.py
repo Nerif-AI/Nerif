@@ -1,12 +1,12 @@
 import base64
 from typing import Any, List, Optional
 
-from .token_counter import NerifTokenCounter
-from .utils import (
+from ..utils import (
     LOGGER,
     NERIF_DEFAULT_LLM_MODEL,
     OPENAI_MODEL,
     MessageType,
+    NerifTokenCounter,
     get_litellm_embedding,
     get_litellm_response,
     get_ollama_response,
@@ -15,7 +15,7 @@ from .utils import (
 )
 
 
-class SimpleChatAgent:
+class SimpleChatModel:
     """
     A simple agent class for the Nerif project.
     This class implements a simple chat agent for the Nerif project.
@@ -104,7 +104,7 @@ class SimpleChatAgent:
         return text_result
 
 
-class SimpleEmbeddingAgent:
+class SimpleEmbeddingModel:
     """
     A simple agent for embedding text.
 
@@ -113,7 +113,7 @@ class SimpleEmbeddingAgent:
         counter (NerifTokenCounter): Token counter instance.
 
     Methods:
-        encode(string: str) -> List[float]: Encodes a string into an embedding.
+        embed(string: str) -> List[float]: Encodes a string into an embedding.
     """
 
     def __init__(
@@ -124,7 +124,7 @@ class SimpleEmbeddingAgent:
         self.model = model
         self.counter = counter
 
-    def encode(self, string: str) -> List[float]:
+    def embed(self, string: str) -> List[float]:
         result = get_litellm_embedding(
             messages=string,
             model=self.model,
@@ -134,7 +134,7 @@ class SimpleEmbeddingAgent:
         return result.data[0]["embedding"]
 
 
-class LogitsAgent:
+class LogitsChatModel:
     """
     A simple agent for fetching logits from a model.
 
@@ -205,7 +205,7 @@ class LogitsAgent:
         return result
 
 
-class VisionAgent:
+class VisionModel:
     """
     A simple agent for vision tasks.
     This class implements a vision-capable agent for the Nerif project.

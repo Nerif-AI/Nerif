@@ -5,8 +5,49 @@ from typing import Any, List, Optional, Union
 
 import litellm
 from openai import OpenAI
+import numpy as np
 
 from .token_counter import NerifTokenCounter
+
+# Environment variables
+
+# OpenAI configuration
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL")
+OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
+
+# Default model settings
+NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
+NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
+
+# OpenRouter configuration
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+OR_SITE_URL = os.environ.get("OR_SITE_URL")
+OR_APP_NAME = os.environ.get("OR_APP_NAME")
+
+# Ollama configuration
+OLLAMA_URL = os.environ.get("OLLAMA_URL")
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY")
+
+# vLLM configuration
+VLLM_URL = os.environ.get("VLLM_URL")
+VLLM_API_KEY = os.environ.get("VLLM_API_KEY")
+
+# SLLM configuration
+SLLM_URL = os.environ.get("SLLM_URL")
+SLLM_API_KEY = os.environ.get("SLLM_API_KEY")
+
+
+def similarity_dist(vec1, vec2, func="cosine"):
+    if type(vec1) is list:
+        vec1 = np.array(vec1)
+    if type(vec2) is list:
+        vec2 = np.array(vec2)
+    if func == "cosine":
+        return 1 - (vec1 @ vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+    else:
+        return np.linalg.norm(vec1 - vec2)
+
 
 # OpenAI Models
 OPENAI_MODEL: List[str] = [
@@ -35,24 +76,6 @@ OPENAI_EMBEDDING_MODEL: List[str] = [
     "text-embedding-ada-002",
 ]
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE")
-
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-OR_SITE_URL = os.environ.get("OR_SITE_URL")
-OR_APP_NAME = os.environ.get("OR_APP_NAME")
-
-OLLAMA_URL = os.environ.get("OLLAMA_URL")
-OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY")
-
-VLLM_URL = os.environ.get("VLLM_URL")
-VLLM_API_KEY = os.environ.get("VLLM_API_KEY")
-
-SLLM_URL = os.environ.get("SLLM_URL")
-SLLM_API_KEY = os.environ.get("SLLM_API_KEY")
-
-NERIF_DEFAULT_LLM_MODEL = os.environ.get("NERIF_DEFAULT_LLM_MODEL", "gpt-4o")
-NERIF_DEFAULT_EMBEDDING_MODEL = os.environ.get("NERIF_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
 
 LOGGER = logging.getLogger("Nerif")
 

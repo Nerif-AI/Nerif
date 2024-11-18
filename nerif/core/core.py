@@ -2,8 +2,8 @@ from typing import Any, List, Optional
 
 import litellm
 
-from ..agent import LogitsAgent, NerifTokenCounter, SimpleChatAgent, SimpleEmbeddingAgent
-from .utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, similarity_dist
+from ..model import LogitsChatModel, NerifTokenCounter, SimpleChatModel, SimpleEmbeddingModel
+from ..utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, similarity_dist
 
 
 def support_logit_mode(model_name):
@@ -59,7 +59,7 @@ class NerificationBase:
         for index in range(len(possible_values)):
             self.possible.append(self.convert(possible_values[index]))
 
-        self.embedding = SimpleEmbeddingAgent(model=model, counter=counter)
+        self.embedding = SimpleEmbeddingModel(model=model, counter=counter)
         self.possible_embed = []
 
     def convert(self, val: Any):
@@ -96,8 +96,8 @@ class NerificationBase:
         if self.possible_embed == []:
             # Embed the possible value and the possible instruction
             for index in range(len(self.possible)):
-                self.possible_embed.append(self.embedding.encode(self.possible[index]))
-        text_embed = self.embedding.encode(self.convert(val))
+                self.possible_embed.append(self.embedding.embed(self.possible[index]))
+        text_embed = self.embedding.embed(self.convert(val))
         min_dist = similarity_dist(text_embed, self.possible_embed[0], similarity)
         min_id = 0
         for index in range(1, len(self.possible_embed)):
@@ -240,8 +240,8 @@ class Nerif:
             "Only answer with 'True' or 'False'."
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(model=model, temperature=temperature, counter=counter)
-        self.logits_agent = LogitsAgent(model=model, temperature=temperature, counter=counter)
+        self.agent = SimpleChatModel(model=model, temperature=temperature, counter=counter)
+        self.logits_agent = LogitsChatModel(model=model, temperature=temperature, counter=counter)
         self.verification = Nerification(counter=counter, model=embed_model)
         self.debug = debug
 
@@ -398,8 +398,8 @@ class NerifMatchString:
             "Choose the best choice from the following options.\n" "Only give me the choice ID, only a number: "
         )
         self.temperature = temperature
-        self.agent = SimpleChatAgent(model=model, temperature=temperature, counter=counter)
-        self.logits_agent = LogitsAgent(model=model, temperature=temperature, counter=counter)
+        self.agent = SimpleChatModel(model=model, temperature=temperature, counter=counter)
+        self.logits_agent = LogitsChatModel(model=model, temperature=temperature, counter=counter)
         self.verification = NerificationInt(
             model=embed_model,
             possible_values=[x for x in range(0, len(choices))],
