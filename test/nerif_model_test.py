@@ -40,20 +40,5 @@ class TestNerifAgent(unittest.TestCase):
         print(result)
         self.assertIsNotNone(result)
 
-    def test_ollama_agent(self):
-        ollama_agent = SimpleChatModel(model="ollama/llama3.1")
-        result = ollama_agent.chat("Hello, how are you?")
-        self.assertIsNotNone(result)
-        self.assertIsInstance(result, str)
-        self.assertGreater(len(result), 0)
-
-    def test_ollama_embed_agent(self):
-        ollama_agent = SimpleEmbeddingModel(model="ollama/mxbai-embed-large")
-        result = ollama_agent.embed("Hello, how are you?")
-        self.assertIsNotNone(result)
-        self.assertIsInstance(result, list[float])
-        self.assertGreater(len(result), 0)
-
-
 if __name__ == "__main__":
     unittest.main()

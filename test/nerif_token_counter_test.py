@@ -3,8 +3,9 @@ import unittest
 
 from litellm import completion, embedding
 
-from nerif.core import nerif
-from nerif.model import NerifTokenCounter, SimpleChatModel, SimpleEmbeddingModel
+from nerif.core import Nerif, nerif
+from nerif.model import SimpleChatModel, SimpleEmbeddingModel
+from nerif.utils import NerifTokenCounter
 
 pretty_printer = pprint.PrettyPrinter()
 
