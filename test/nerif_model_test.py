@@ -40,5 +40,6 @@ class TestNerifAgent(unittest.TestCase):
         print(result)
         self.assertIsNotNone(result)
 
+
 if __name__ == "__main__":
     unittest.main()

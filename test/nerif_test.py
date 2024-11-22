@@ -22,6 +22,5 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(2, best_choice)
 
 
-
 if __name__ == "__main__":
     unittest.main()
