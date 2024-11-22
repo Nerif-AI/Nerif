@@ -94,7 +94,7 @@ class SimpleChatModel:
         elif self.model.startswith("sllm"):
             result = get_sllm_response(self.messages, **kwargs)
         else:
-            raise ValueError(f"Model {self.model} not supported")
+            result = get_litellm_response(self.messages, **kwargs)
 
         text_result = result.choices[0].message.content
         if append:
