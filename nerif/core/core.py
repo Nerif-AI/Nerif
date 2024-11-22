@@ -191,7 +191,10 @@ class NerificationInt(NerificationBase):
         return str(val)
 
     def verify(self, val: Any):
-        return super().verify(val)
+        if isinstance(val, int):
+            return super().verify(val)
+        else:
+            return False
 
     def simple_fit(self, val: Any):
         return int(super().simple_fit(val))
@@ -292,8 +295,12 @@ class Nerif:
         question = "<question>\n" + text + "</question>\n"
         user_prompt = self.prompt.replace("<question>", question)
         response = self.agent.chat(user_prompt, max_tokens=10)
-        if self.verification.verify(response):
-            return response
+        try:
+            direct_result = int(response)
+            if self.verification.verify(direct_result):
+                return direct_result
+        except:
+            pass
         simple_fit = self.verification.simple_fit(response)
         if simple_fit is not None:
             return simple_fit
