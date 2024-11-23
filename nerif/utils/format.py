@@ -112,6 +112,58 @@ class FormatVerifierHumanReadableList(FormatVerifierBase):
         return self.match(val)
 
 
+class FormatVerifierStringList(FormatVerifierBase):
+    cls = list[str]
+    simple = False
+    pattern = re.compile(r'\[(?:\s*(?:"[^"]*"|\"[^\"]*\")\s*,?)*\s*\]', flags=re.DOTALL)
+
+    def verify(self, val: str) -> bool:
+        have_bound = val.startswith("[") and val.endswith("]")
+        if have_bound:
+            val = val[1:-1]
+            val = val.split(",")
+            return True
+        return False
+
+    def match(self, val: str) -> list[int]:
+        candidate = self.pattern.findall(val)
+        if len(candidate) > 0:
+            return self.convert(candidate[0])
+        # If regex pattern didn't match, try alternative string list formats:
+        # 1. Python list with mismatched quotes
+        # 2. Markdown-style bullet points
+        # 3. Numbered lists
+        if "[" in val and "]" in val:
+            candidate = val[val.find("[") : val.rfind("]") + 1]
+            candidate = candidate.split(",")
+            candidate = [x.strip()[1:-1] for x in candidate]
+            return candidate
+
+        # Not a valid Python list - attempt to parse as a Markdown-style list (e.g. "- item" or "* item")
+        candidate = val.split("\n")
+        candidate = [x.strip() for x in candidate if x.strip() != ""]
+        candidate = [x for x in candidate if x.startswith("-") or x.startswith("*") or x.startswith("+")]
+        candidate = [x[1:].strip() for x in candidate]
+        if len(candidate) > 0:
+            return candidate
+        # Try parsing as a numbered list format (e.g. "1. item")
+        index_pattern = re.compile(r"\d+\.\s")
+        candidate = val.split("\n")
+        candidate = [x.strip() for x in candidate]
+        candidate = [x for x in candidate if index_pattern.match(x)]
+        candidate = [x[x.find(".") :].strip() for x in candidate]
+        if len(candidate) > 0:
+            return candidate
+        return None
+
+    def convert(self, val: str) -> list[int]:
+        try:
+            res = eval(val.strip())
+        except Exception as e:
+            print("Cannot convet because error {}".format(e))
+        return res
+
+
 class NerifFormat:
     """
     Convert llm response to given type
