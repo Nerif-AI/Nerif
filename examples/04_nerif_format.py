@@ -1,4 +1,4 @@
-from nerif.core import (
+from nerif.utils import (
     FormatVerifierFloat,
     FormatVerifierHumanReadableList,
     FormatVerifierInt,
@@ -49,9 +49,7 @@ Here are some fluits:
 5. Elderberry
 6.     Fig
 """
-result_list = formatter.try_convert(
-    human_readable_list, FormatVerifierHumanReadableList
-)
+result_list = formatter.try_convert(human_readable_list, FormatVerifierHumanReadableList)
 print(result_list)
 
 

@@ -1,6 +1,13 @@
 # Contributing to Nerif
 
-# Contributors
+## Table of Contents
+
+- [Contributors](#contributors)
+- [Check Code Format](#check-code-format)
+- [Commit Message Guidelines](#commit-message-guidelines)
+- [Pull Requests](#pull-requests)
+
+## Contributors
 
 Nerif is currently maintained by the following contributors:
 
@@ -11,17 +18,22 @@ Nerif is currently maintained by the following contributors:
 ## Check Code Format
 
 ```bash
-pip install ruff
-pip install isort
+pip install ruff isort
 
-# Format Python import packages
+# sort import
 isort .
 
 # Check code format
-ruff check
+ruff check . --select I --fix
 
 #Run code format
 ruff format
+```
+
+You can also use the script `scripts/format.sh` to format the code.
+
+```bash
+bash ./scripts/format.sh
 ```
 
 ## Commit Message Guidelines
@@ -30,94 +42,33 @@ We follow the commit format rule based on the [Angular Commit Format](https://gi
 
 ### Commit Message Structure
 
-Each commit message should consist of a **header**, **body**, and **footer**:
+Each commit message should consist of a **header** and a **body**:
 
 ```
-<type>(<scope>): <short summary>
+<type>: <summary>
 <BLANK LINE>
-<body>
+<body>(optional)
 <BLANK LINE>
-<footer>
 ```
-
-- **Header**: Mandatory. Contains the commit type, optional scope, and a brief summary.
+- **Type**: Choose from `build`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `test`, `chore`.
+- **Summary**: A brief description of the change.
 - **Body**: Mandatory for all commits except those of type "docs". Must be at least 20 characters long.
-- **Footer**: Optional. Used for breaking changes, deprecations, or references to issues/PRs.
 
-### Commit Message Header
 
-The header must follow this format:
+Examples:
 
 ```
-<type>(<scope>): <short summary>
-  │       │             │
-  │       │             └─⫸ Summary in present tense. Not capitalized. No period at the end.
-  │       │
-  │       └─⫸ Commit Scope: serve|store|cli
-  │
-  └─⫸ Commit Type: build|ci|docs|feat|fix|perf|refactor|test|chore
+feat: add logging in sllm worker
 ```
 
-- **type**: Specifies the nature of the commit. Must be one of the following:
-  - `build`: Changes that affect the build system or external dependencies
-  - `ci`: Changes to our CI configuration files and scripts
-  - `docs`: Documentation only changes
-  - `feat`: A new feature
-  - `fix`: A bug fix
-  - `perf`: A code change that improves performance
-  - `refactor`: A code change that neither fixes a bug nor adds a feature
-  - `test`: Adding missing tests or correcting existing tests
-  - `chore`: Minor editing jobs (e.g., updating README)
-- **scope**: Optional. Specifies the area of the codebase affected. For example:
-  - serve
-  - store
-  - cli
-- **summary**: A brief description of the change. Must:
-  - Be in the imperative, present tense: "change" not "changed" nor "changes"
-  - Not capitalize the first letter
-  - Not end with a period
-
-### Commit Message Body
-
-The body should explain the motivation for the change and contrast it with the previous behavior. It must:
-
-- Use the imperative, present tense: "fix" not "fixed" nor "fixes".
-- Be at least 20 characters long.
-
-### Commit Message Footer
-
-The footer can contain additional information such as breaking changes, deprecations, or references to issues/PRs. Use the following formats:
-
-**Breaking Changes**:
-
 ```
-<TEXT>
-BREAKING CHANGE: <breaking change summary>
-<BLANK LINE>
-<breaking change description + migration instructions>
-<BLANK LINE>
-<BLANK LINE>
-Fixes #<issue number>
+docs: add new example for serving vision model
+
+Vision mode: xxx
+Implemented xxx in `xxx.py`
 ```
 
-**Deprecations**:
-
-```
-<TEXT>
-DEPRECATED: <what is deprecated>
-<BLANK LINE>
-<deprecation description + recommended update path>
-<BLANK LINE>
-<BLANK LINE>
-Closes #<pr number>
-```
-
-### Revert Commits
-
-If reverting a previous commit, the message should start with `revert:` followed by the header of the reverted commit. The body should contain:
-
-- Information about the SHA of the commit being reverted in the format: `This reverts commit <SHA>`
-- A clear description of the reason for reverting the commit.
+For more details, read the [Angular Commit Format](https://github.com/angular/angular/blob/main/CONTRIBUTING.md#-commit-message-format).
 
 ## Pull Requests
 
@@ -212,19 +163,19 @@ Let's walk through an example of adding a new checkpoint format:
    ```bash
    # Implement new checkpoint format
    git add .
-   git commit -m "Add basic structure for new checkpoint format"
+   git commit -m "feat: Add basic structure for new checkpoint format"
 
    # Add serialization method
    git add .
-   git commit -m "Implement serialization for new format"
+   git commit -m "feat: Implement serialization for new format"
 
    # Add deserialization method
    git add .
-   git commit -m "Implement deserialization for new format"
+   git commit -m "feat: Implement deserialization for new format"
 
    # Fix a bug in serialization
    git add .
-   git commit -m "Fix endianness issue in serialization"
+   git commit -m "fix: Fix endianness issue in serialization"
    ```
 
 3. Push your branch and create a pull request on GitHub.
@@ -248,82 +199,4 @@ Let's walk through an example of adding a new checkpoint format:
    - Implement serialization for new format
    - Implement deserialization for new format
    - Fix endianness issue in serialization
-   ```
-
-#### How to Squash and Merge
-
-When a pull request is ready to be merged:
-
-1. Go to the pull request page on GitHub.
-2. Click the "Merge pull request" dropdown and select "Squash and merge".
-3. Edit the commit message to provide a clear, concise summary of the changes.
-4. Click "Confirm squash and merge".
-
-#### After Merging
-
-After your pull request is merged:
-
-1. Delete your local feature branch:
-
-   ```bash
-   git checkout main
-   git branch -d feature/add-new-checkpoint-format
-   ```
-
-2. Update your local main branch:
-
-   ```bash
-   git pull origin main
-   ```
-
-3. Delete the remote feature branch:
-
-   ```bash
-   git push origin --delete feature/add-new-checkpoint-format
-   ```
-
-By following this workflow, we maintain a clean and organized main branch, making it easier for all contributors to understand the project's history and collaborate effectively. The detailed development process remains available in the pull request history, providing the best of both worlds: a clean main branch and preserved development details.
-
-## Release
-### Release with Github Workflow
-1. Bump the version number in `Nerif/setup.py` and `Nerif/serverless_llm/setup.py`
-```
-setup(
-    name=...,
-    version="<version-number>",
-    ext_modules=...
-    ...
-)
-```
-2. Tag the current commit and push:
-```
-git tag v<x.x.x>
-git push origin v<x.x.x>
-``` 
-
-### Release Manually
-1. Build the package in an NVIDIA container.
-
-   ```bash
-   docker build -t sllm_store_builder -f Dockerfile.builder .
-   docker run -it --rm -v $(pwd)/dist:/app/dist sllm_store_builder /bin/bash
-   # TODO: use workflow to build the package.
-   export PYTHON_VERSION=310
-   export TORCH_CUDA_ARCH_LIST="8.0 8.6 8.9 9.0"
-   conda activate py${PYTHON_VERSION} && python setup.py sdist bdist_wheel
-   ```
-
-2. Upload the package to TestPyPI.
-
-   ```bash
-   pip install twine
-   # NOTE: rename "linux" to "manylinux1" in the generated wheel file.
-   twine upload --repository-url https://test.pypi.org/legacy/ dist/*
-   ```
-
-3. Install the package from TestPyPI.
-
-   ```bash
-   # Create a virtual environment
-   pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ nerif==0.0.1dev4
    ```

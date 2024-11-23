@@ -5,7 +5,7 @@ import warnings
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from nerif.core import (
+from nerif.utils import (
     FormatVerifierFloat,
     FormatVerifierHumanReadableList,
     FormatVerifierInt,
@@ -69,11 +69,10 @@ class TestNerifFormat(unittest.TestCase):
         6.     Fig
         """
         formatter = NerifFormat()
-        result_list = formatter.try_convert(
-            human_readable_list, FormatVerifierHumanReadableList
-        )
+        result_list = formatter.try_convert(human_readable_list, FormatVerifierHumanReadableList)
         self.assertEqual(
-            result_list, ["Apple", "Banana", "Cherry", "Durian", "Elderberry", "Fig"]
+            result_list,
+            ["Apple", "Banana", "Cherry", "Durian", "Elderberry", "Fig"],
         )
 
         failed_response1 = "There is no available result"

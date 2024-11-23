@@ -6,19 +6,13 @@ class FormatVerifierBase:
     simple = True
 
     def verify(self, val: str) -> bool:
-        raise NotImplementedError(
-            "Verify method of FormatVerifierBase is not implemented"
-        )
+        raise NotImplementedError("Verify method of FormatVerifierBase is not implemented")
 
     def match(self, val: str) -> any:
-        raise NotImplementedError(
-            "Match method of FormatVerifierBase is not implemented"
-        )
+        raise NotImplementedError("Match method of FormatVerifierBase is not implemented")
 
     def convert(self, val: str) -> any:
-        raise NotImplementedError(
-            "Convert method of FormatVerifierBase is not implemented"
-        )
+        raise NotImplementedError("Convert method of FormatVerifierBase is not implemented")
 
     def __call__(self, val: str) -> any:
         if self.verify(val):
@@ -28,7 +22,7 @@ class FormatVerifierBase:
             if res is not None:
                 return res
             else:
-                raise ValueError("Cannot convert to {}".format(self.cls.__name__))
+                raise ValueError("Cannot convert {} to {}".format(val, self.cls.__name__))
 
 
 class FormatVerifierInt(FormatVerifierBase):

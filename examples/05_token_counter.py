@@ -1,5 +1,5 @@
-from nerif.agent import NerifTokenCounter
 from nerif.core import nerif
+from nerif.utils import NerifTokenCounter
 
 counter = NerifTokenCounter()
 

@@ -3,8 +3,9 @@ import unittest
 
 from litellm import completion, embedding
 
-from nerif.agent import NerifTokenCounter, SimpleChatAgent, SimpleEmbeddingAgent
-from nerif.core import nerif
+from nerif.core import Nerif, nerif
+from nerif.model import SimpleChatModel, SimpleEmbeddingModel
+from nerif.utils import NerifTokenCounter
 
 pretty_printer = pprint.PrettyPrinter()
 
@@ -25,10 +26,12 @@ class TestTokenCounter(unittest.TestCase):
 
         self.assertEqual(len(counter.model_token.model_cost), 1)
         self.assertGreater(
-            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].request, 0
+            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].request,
+            0,
         )
         self.assertGreater(
-            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].response, 0
+            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].response,
+            0,
         )
 
     def test_counting_embedding_raw(self):
@@ -60,13 +63,13 @@ class TestTokenCounter(unittest.TestCase):
 
     def test_couting_agent(self):
         counter = NerifTokenCounter()
-        chat_agent = SimpleChatAgent(counter=counter)
-        embedding_agent = SimpleEmbeddingAgent(counter=counter)
+        chat_agent = SimpleChatModel(counter=counter)
+        embedding_agent = SimpleEmbeddingModel(counter=counter)
 
         _ = chat_agent.chat("Which mobile suit is the most powerful one in Z Gundam.")
         self.assertEqual(len(counter.model_token.model_cost), 1)
 
-        _ = embedding_agent.encode("Hello world")
+        _ = embedding_agent.embed("Hello world")
         self.assertEqual(len(counter.model_token.model_cost), 2)
 
         _ = chat_agent.chat("Which mobile suit is the less powerful in Gundam NT")
@@ -84,17 +87,11 @@ class TestTokenCounter(unittest.TestCase):
     def test_set_parser(self):
         counter = NerifTokenCounter()
         counter.set_parser_based_on_model("openrouter/openai/gpt-4o-2024-08-06")
-        self.assertEqual(
-            counter.response_parser.__class__.__name__, "OpenAIResponseParser"
-        )
+        self.assertEqual(counter.response_parser.__class__.__name__, "OpenAIResponseParser")
         counter.set_parser_based_on_model("ollama/llama3.1")
-        self.assertEqual(
-            counter.response_parser.__class__.__name__, "OllamaResponseParser"
-        )
+        self.assertEqual(counter.response_parser.__class__.__name__, "OllamaResponseParser")
         counter.set_parser_based_on_model("openrouter/meta/llama3.1")
-        self.assertEqual(
-            counter.response_parser.__class__.__name__, "OpenAIResponseParser"
-        )
+        self.assertEqual(counter.response_parser.__class__.__name__, "OpenAIResponseParser")
 
 
 if __name__ == "__main__":

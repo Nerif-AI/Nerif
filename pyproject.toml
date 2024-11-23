@@ -4,10 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nerif"
-version = "0.7.2"
+version = "0.9.3"
+
 description = "LLM powered Python"
 readme = "README.md"
-authors = [{ name = "Chivier Humber"}]
+authors = [{ name = "Chivier Humber" }]
 license = { file = "LICENSE" }
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
@@ -22,41 +23,52 @@ dependencies = [
     "openai",
     "python-dotenv",
     "litellm",
-    "prettytable"
+    "prettytable",
 ]
 requires-python = ">=3.8"
 
 [tool.pytest.ini_options]
-addopts = [
-    "--import-mode=importlib",
-]
+addopts = ["--import-mode=importlib"]
 
 [project.optional-dependencies]
-dev = ["black", "bumpver", "isort", "pip-tools", "pytest", "ipython"]
+dev = ["bumpver", "ruff", "pip-tools", "pytest", "ipython", "isort"]
 
 [project.urls]
-Homepage = "https://github.com/Chivier/nerif"
+Homepage = "https://github.com/Nerif-AI/nerif"
 
 [tool.bumpver]
-current_version = "0.7.2"
+current_version = "0.9.3"
+
 version_pattern = "MAJOR.MINOR.PATCH"
-commit_message  = "Bump version {old_version} -> {new_version}"
-commit          = true
-tag             = true
-push            = false
+commit_message = "Bump version {old_version} -> {new_version}"
+commit = true
+tag = true
+push = false
 
 [tool.bumpver.file_patterns]
 "pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
 
-[tool.black]
+[tool.ruff]
+exclude = [
+    ".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".ipynb_checkpoints",
+    ".mypy_cache", ".nox", ".pants.d", ".pyenv", ".pytest_cache", ".pytype",
+    ".ruff_cache", ".svn", ".tox", ".venv", ".vscode", "__pypackages__",
+    "_build", "buck-out", "build", "dist", "node_modules", "site-packages", "venv",
+]
 line-length = 120
-target-version = ['py38']
+indent-width = 4
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
-line_length = 88
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+ignore = []
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
