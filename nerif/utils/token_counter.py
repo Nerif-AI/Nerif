@@ -92,10 +92,19 @@ class NerifTokenCounter:
         self.response_parser = parser
 
     def set_parser_based_on_model(self, model_name: str):
-        if model_name.startswith("ollama"):
-            self.set_parser(OllamaResponseParser())
-        else:
-            self.set_parser(OpenAIResponseParser())
+        """
+        Sets the response parser based on the provided model name.
+
+        Currently, since Ollama's requests are proxied through LiteLLM which formats responses
+        in OpenAI compatible format, we use OpenAIResponseParser for all responses.
+
+        Args:
+            model_name (str): Name of the model to set parser for
+
+        Returns:
+            None
+        """
+        self.set_parser(OpenAIResponseParser())
 
     def count_from_response(self, response):
         """
