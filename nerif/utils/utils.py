@@ -185,7 +185,13 @@ def get_litellm_response(
             "messages": messages,
         }
     else:
-        raise ValueError(f"Model {model} not supported")
+        # default method: use openai style
+        kargs = {
+            "model": model,
+            "messages": messages,
+            "api_key": api_key,
+            "base_url": base_url,
+        }
 
     kargs["stream"] = stream
     kargs["temperature"] = temperature
