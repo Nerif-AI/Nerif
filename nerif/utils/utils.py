@@ -258,9 +258,6 @@ def get_ollama_response(
 
     return response
 
-def get_llm_client(model: str, url: str, api_key: str):
-    pass
-
 def get_vllm_response(
     messages: List[Any],
     url: str = VLLM_URL,
