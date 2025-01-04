@@ -19,6 +19,16 @@ Our goal is to make LLMs easier to use for developers, turning complex AI capabi
 ### Pre-requisite
 
 - Python >= 3.9
+- Environment variable `OPENAI_API_KEY` or other LLM API keys, for more details, see [here](https://nerif-ai.com/docs/nerif-environment)
+- Set default model and embedding model with `NERIF_DEFAULT_LLM_MODEL` and `NERIF_DEFAULT_EMBEDDING_MODEL`, for more details, see [here](https://nerif-ai.com/docs/nerif-environment)
+
+Example:
+
+```bash
+export OPENAI_API_KEY=`your_api_key`
+export NERIF_DEFAULT_LLM_MODEL=gpt-4o
+export NERIF_DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
+```
 
 ### Install
 
@@ -33,6 +43,7 @@ from nerif.core import nerif
 from nerif.model import SimpleChatModel
 
 model = SimpleChatModel()
+# Default model is `gpt-4o`
 
 # Use nerif judge "natural language statement"
 if nerif("the sky is blue"):
