@@ -1,9 +1,8 @@
 import base64
+from pathlib import Path
 from typing import Any, List, Optional
 
-from pathlib import Path
 from openai import OpenAI
-
 
 from ..utils import (
     LOGGER,
@@ -17,6 +16,7 @@ from ..utils import (
     get_sllm_response,
     get_vllm_response,
 )
+
 
 class AudioModel:
     """
@@ -33,6 +33,7 @@ class AudioModel:
                 file=audio_file,
             )
         return transcription
+
 
 class SpeechModel:
     """

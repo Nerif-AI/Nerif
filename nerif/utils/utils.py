@@ -258,6 +258,7 @@ def get_ollama_response(
 
     return response
 
+
 def get_vllm_response(
     messages: List[Any],
     url: str = VLLM_URL,
