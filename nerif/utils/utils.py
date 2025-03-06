@@ -111,10 +111,16 @@ def get_litellm_embedding(
             "input": messages,
         }
     elif model.startswith("ollama"):
+        if base_url is None or base_url == "" or os.environ.get("OLLAMA_URL") is None:
+            # default ollama url
+            base_url = "http://localhost:11434/v1/"
+            
         kargs = {
             "model": model,
             "input": messages,
+            "base_url": base_url,
         }
+
 
     response = litellm.embedding(**kargs)
 
@@ -170,9 +176,13 @@ def get_litellm_response(
             "messages": messages,
         }
     elif model.startswith("ollama"):
+        if base_url is None or base_url == "":
+            # default ollama url
+            base_url = "http://localhost:11434/v1/"
         kargs = {
             "model": model,
             "messages": messages,
+            "base_url": base_url,
         }
     elif model.startswith("vllm"):
         kargs = {
