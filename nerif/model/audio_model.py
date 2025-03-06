@@ -1,21 +1,6 @@
-import base64
 from pathlib import Path
-from typing import Any, List, Optional
 
 from openai import OpenAI
-
-from ..utils import (
-    LOGGER,
-    NERIF_DEFAULT_LLM_MODEL,
-    OPENAI_MODEL,
-    MessageType,
-    NerifTokenCounter,
-    get_litellm_embedding,
-    get_litellm_response,
-    get_ollama_response,
-    get_sllm_response,
-    get_vllm_response,
-)
 
 
 class AudioModel:

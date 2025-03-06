@@ -5,7 +5,7 @@ import warnings
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from nerif.model import LogitsChatModel, SimpleChatModel, SimpleEmbeddingModel
+from nerif.model import LogitsChatModel, SimpleChatModel
 
 
 class TestNerifAgent(unittest.TestCase):
