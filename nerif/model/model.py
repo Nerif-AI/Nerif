@@ -1,5 +1,6 @@
 import base64
 from typing import Any, List, Optional
+import re
 
 from ..utils import (
     LOGGER,
@@ -101,6 +102,8 @@ class SimpleChatModel:
             self.messages.append({"role": "system", "content": text_result})
         else:
             self.reset()
+        # Remove content inside <think> tags if present
+        text_result = re.sub(r'<think>.*?</think>', '', text_result, flags=re.DOTALL)
         return text_result
 
 
