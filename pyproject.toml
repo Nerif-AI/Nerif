@@ -24,6 +24,7 @@ dependencies = [
     "python-dotenv",
     "litellm",
     "prettytable",
+    "Pillow>=9.0.0",
 ]
 requires-python = ">=3.8"
 
@@ -32,6 +33,7 @@ addopts = ["--import-mode=importlib"]
 
 [project.optional-dependencies]
 dev = ["bumpver", "ruff", "pip-tools", "pytest", "ipython", "isort"]
+image = ["Pillow>=9.0.0"]
 
 [project.urls]
 Homepage = "https://github.com/Nerif-AI/nerif"

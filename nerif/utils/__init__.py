@@ -6,6 +6,7 @@ from .format import (
     FormatVerifierListInt,
     NerifFormat,
 )
+from .image_compress import ImageCompressor, compress_image_simple
 from .log import NerifFormatter, set_up_logging, timestamp_filename
 from .token_counter import ModelCost, NerifTokenCounter, OllamaResponseParser, OpenAIResponseParser, ResponseParserBase
 from .utils import (
@@ -40,6 +41,9 @@ __all__ = [
     "FormatVerifierListInt",
     "MessageType",
     "NerifFormat",
+    # image compression
+    "ImageCompressor",
+    "compress_image_simple",
     # log
     "NerifFormatter",
     "set_up_logging",
