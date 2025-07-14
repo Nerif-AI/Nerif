@@ -162,3 +162,6 @@ cython_debug/
 debug
 .vscode
 set_key.sh
+
+.claude
+CLAUDE.md
