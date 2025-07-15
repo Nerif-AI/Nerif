@@ -11,11 +11,9 @@ import io
 import tempfile
 from pathlib import Path
 
-import requests
 from PIL import Image
 
 from nerif.model.vision_model_enhanced import VisionModelWithCompression
-from nerif.utils import MessageType
 
 
 def create_sample_images(output_dir: Path) -> dict:
@@ -112,7 +110,7 @@ def example_basic_vlm_compression():
             max_image_size=(2048, 2048),  # GPT-4V recommended size
         )
 
-        print(f"\nVLM compression settings:")
+        print("\nVLM compression settings:")
         stats = vlm.get_compression_stats()
         print(f"  - Model: {vlm.model}")
         print(f"  - Compression threshold: {stats['compression_threshold_mb']} MB")
@@ -121,7 +119,7 @@ def example_basic_vlm_compression():
         print(f"  - VLM optimized settings: {stats['vlm_optimized_settings']}")
 
         # Add large image
-        print(f"\nAdding high-resolution photo...")
+        print("\nAdding high-resolution photo...")
         original_size = images["large_photo"].stat().st_size
         print(f"Original size: {original_size / 1024 / 1024:.2f} MB")
 
@@ -150,18 +148,18 @@ def example_different_image_sources():
             compression_threshold_mb=0.5,
         )
 
-        print(f"\nUsing Claude's optimized settings:")
+        print("\nUsing Claude's optimized settings:")
         claude_settings = vlm._get_vlm_optimized_settings()
         print(f"  - Max size: {claude_settings['max_size']}")
         print(f"  - Max file size: {claude_settings['max_file_size_mb']} MB")
 
         # 1. File path
-        print(f"\n1. Adding image from file path:")
+        print("\n1. Adding image from file path:")
         vlm.add_image(images["screenshot"], source_type="path")
         print(f"   Added screenshot: {images['screenshot']}")
 
         # 2. Base64 data
-        print(f"\n2. Adding image from Base64 data:")
+        print("\n2. Adding image from Base64 data:")
         with open(images["diagram"], "rb") as f:
             img_bytes = f.read()
         base64_data = base64.b64encode(img_bytes).decode("utf-8")
@@ -172,7 +170,7 @@ def example_different_image_sources():
         print(f"   Added Base64 image (original ~{original_base64_size / 1024 / 1024:.2f} MB)")
 
         # 3. Byte data
-        print(f"\n3. Adding image from byte data:")
+        print("\n3. Adding image from byte data:")
         with open(images["art"], "rb") as f:
             art_bytes = f.read()
 
@@ -180,9 +178,9 @@ def example_different_image_sources():
         print(f"   Added artistic image byte data ({len(art_bytes) / 1024 / 1024:.2f} MB)")
 
         # 4. Auto-detection
-        print(f"\n4. Auto-detecting image type:")
+        print("\n4. Auto-detecting image type:")
         vlm.add_image(images["large_photo"])  # Auto-detected as file path
-        print(f"   Auto-detected and added photo")
+        print("   Auto-detected and added photo")
 
         vlm.add_text("Please analyze the characteristics and differences of these images.")
 
@@ -252,7 +250,7 @@ def example_compression_comparison():
         print(f"Original size: {original_size / 1024 / 1024:.2f} MB")
         print(f"Original dimensions: {Image.open(test_image).size}")
 
-        print(f"\nCompression effect comparison:")
+        print("\nCompression effect comparison:")
 
         for config in compression_configs:
             vlm = VisionModelWithCompression(
@@ -288,7 +286,7 @@ def example_smart_format_conversion():
 
         vlm = VisionModelWithCompression(enable_compression=True, compression_threshold_mb=0.3, jpeg_quality=85)
 
-        print(f"\nTesting format conversion for different image types:")
+        print("\nTesting format conversion for different image types:")
 
         test_cases = [
             {"name": "Photo (JPEG)", "path": images["large_photo"], "description": "Usually keeps JPEG format"},
@@ -385,7 +383,7 @@ def example_batch_vlm_processing():
             vlm.add_text(task["prompt"])
 
             print(f"  Total original size: {total_original_size / 1024 / 1024:.2f} MB")
-            print(f"  Images compressed and ready to send")
+            print("  Images compressed and ready to send")
 
             # Display VLM cache status
             image_count = len([c for c in vlm.content_cache if c["type"] == "image_url"])

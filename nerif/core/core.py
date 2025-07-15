@@ -299,7 +299,7 @@ class Nerif:
             direct_result = int(response)
             if self.verification.verify(direct_result):
                 return direct_result
-        except:
+        except (ValueError, TypeError):
             pass
         simple_fit = self.verification.simple_fit(response)
         if simple_fit is not None:

@@ -1,9 +1,8 @@
-import json
 import tempfile
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 from nerif.batch import Batch, BatchFile
 from nerif.batch.batch import BatchStatus

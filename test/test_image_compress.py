@@ -1,4 +1,3 @@
-import io
 import shutil
 import tempfile
 import unittest
@@ -184,7 +183,7 @@ class TestImageCompressor(unittest.TestCase):
         output_dir = self.temp_dir / "compressed"
 
         # Compress batch
-        results = self.compressor.compress_batch(image_paths, output_dir)
+        self.compressor.compress_batch(image_paths, output_dir)
 
         # Verify output files exist
         self.assertTrue(output_dir.exists())

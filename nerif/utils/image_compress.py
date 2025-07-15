@@ -5,7 +5,6 @@ Automatically compresses images larger than 1MB using lossless and lossy techniq
 
 import io
 import logging
-import os
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
@@ -84,7 +83,7 @@ class ImageCompressor:
                 if preserve_metadata and hasattr(img, "_getexif"):
                     try:
                         exif_data = img.info.get("exif", img._getexif())
-                    except:
+                    except Exception:
                         exif_data = None
 
                 # Determine compression strategy
