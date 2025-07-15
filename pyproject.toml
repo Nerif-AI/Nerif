@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nerif"
-version = "0.9.5"
+version = "0.10.1"
 
 description = "LLM powered Python"
 readme = "README.md"
@@ -26,8 +26,9 @@ dependencies = [
     "python-dotenv",
     "litellm",
     "prettytable",
+    "Pillow>=9.0.0",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 
 [tool.hatch.build.targets.wheel]
 package-dir = ["nerif"]
@@ -40,12 +41,13 @@ addopts = ["--import-mode=importlib"]
 
 [project.optional-dependencies]
 dev = ["bumpver", "ruff", "pip-tools", "pytest", "ipython", "isort"]
+image = ["Pillow>=9.0.0"]
 
 [project.urls]
 Homepage = "https://nerif-ai.com"
 
 [tool.bumpver]
-current_version = "0.9.5"
+current_version = "0.10.1"
 
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "release: Bump version {old_version} -> {new_version}"
