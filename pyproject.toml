@@ -28,7 +28,7 @@ dependencies = [
     "prettytable",
     "Pillow>=9.0.0",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 
 [tool.hatch.build.targets.wheel]
 package-dir = ["nerif"]
