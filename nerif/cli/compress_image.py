@@ -6,7 +6,6 @@ Command-line interface for image compression.
 import argparse
 import sys
 from pathlib import Path
-from typing import List
 
 from ..utils.image_compress import ImageCompressor
 
@@ -156,7 +155,7 @@ Examples:
             # Show statistics
             if len(results) > 1:
                 stats = compressor.get_compression_stats(results)
-                print(f"\nSummary:")
+                print("\nSummary:")
                 print(f"  Total files: {stats['total_files']}")
                 print(f"  Compressed: {stats['compressed_files']}")
                 print(f"  Skipped: {stats['skipped_files']}")
@@ -184,7 +183,7 @@ Examples:
                 except Exception as e:
                     print(f"Error checking {image_path}: {e}", file=sys.stderr)
 
-            print(f"\nDry run summary:")
+            print("\nDry run summary:")
             print(f"  Total files: {len(image_paths)}")
             print(f"  Would compress: {would_compress}")
             print(f"  Total size: {total_size / 1024 / 1024:.2f} MB")

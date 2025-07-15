@@ -3,12 +3,11 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 from PIL import Image
 
 from nerif.model.vision_model_enhanced import VisionModelWithCompression
-from nerif.utils import MessageType
 
 
 class TestVisionModelWithCompression(unittest.TestCase):
@@ -244,7 +243,7 @@ class TestVisionModelWithCompression(unittest.TestCase):
         with patch.object(
             self.vision_model, "_compress_image_data", wraps=self.vision_model._compress_image_data
         ) as mock_compress:
-            processed_url = self.vision_model._process_image_path(str(small_img_path))
+            self.vision_model._process_image_path(str(small_img_path))
 
             # Should still process but compression should note it's below threshold
             mock_compress.assert_called_once()
@@ -371,8 +370,6 @@ class TestVisionModelIntegration(unittest.TestCase):
 
         img_path = self.temp_dir / "large_test.jpg"
         img.save(img_path, format="JPEG", quality=95)
-
-        original_size = img_path.stat().st_size
 
         # Process with VisionModel
         vision_model = VisionModelWithCompression(

@@ -113,20 +113,20 @@ def example_advanced_compression():
             convert_to_jpeg_threshold=0.8,  # More conservative format conversion
         )
 
-        print(f"\nCompressor settings:")
+        print("\nCompressor settings:")
         print(f"  - Size threshold: {compressor.size_threshold_bytes / 1024 / 1024:.1f} MB")
         print(f"  - JPEG quality: {compressor.jpeg_quality}")
         print(f"  - PNG compression level: {compressor.png_compress_level}")
 
         # Compress single image
-        print(f"\nCompressing single image:")
+        print("\nCompressing single image:")
         large_png = temp_path / "large_diagram.png"
 
         was_compressed, ratio, message = compressor.compress_image(large_png)
         print(f"  {large_png.name}: {message}")
 
         # Compress to different output file
-        print(f"\nCompressing to new file:")
+        print("\nCompressing to new file:")
         original_jpg = temp_path / "large_photo.jpg"
         compressed_jpg = temp_path / "compressed_photo.jpg"
 
@@ -166,7 +166,7 @@ def example_batch_compression():
         results = compressor.compress_batch(image_files)
 
         # Display results
-        print(f"\nCompression results:")
+        print("\nCompression results:")
         for path, was_compressed, ratio, message in results:
             status = "✓" if was_compressed else "-"
             filename = Path(path).name
@@ -174,7 +174,7 @@ def example_batch_compression():
 
         # Display statistics
         stats = compressor.get_compression_stats(results)
-        print(f"\nStatistics:")
+        print("\nStatistics:")
         print(f"  - Total files: {stats['total_files']}")
         print(f"  - Compressed: {stats['compressed_files']}")
         print(f"  - Skipped: {stats['skipped_files']}")
@@ -214,7 +214,7 @@ def example_batch_with_output_directory():
         for pattern in ["*.jpg", "*.png"]:
             all_images.extend(input_dir.rglob(pattern))
 
-        print(f"\nInput directory structure:")
+        print("\nInput directory structure:")
         for img_path in all_images:
             rel_path = img_path.relative_to(input_dir)
             size_mb = img_path.stat().st_size / 1024 / 1024
@@ -231,14 +231,14 @@ def example_batch_with_output_directory():
         )
 
         # Display results
-        print(f"\nCompression results:")
+        print("\nCompression results:")
         for path, was_compressed, ratio, message in results:
             status = "✓" if was_compressed else "-"
             rel_path = Path(path).relative_to(input_dir)
             print(f"  {status} {rel_path}: {message}")
 
         # Check output directory structure
-        print(f"\nOutput directory structure:")
+        print("\nOutput directory structure:")
         if output_dir.exists():
             for output_file in output_dir.rglob("*"):
                 if output_file.is_file():
@@ -269,7 +269,7 @@ def example_custom_compression_settings():
             {"name": "High Compression", "jpeg_quality": 70, "png_compress_level": 9},
         ]
 
-        print(f"\nTesting different compression settings:")
+        print("\nTesting different compression settings:")
 
         for config in test_configs:
             # Copy original file for testing

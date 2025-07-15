@@ -1,6 +1,5 @@
 import base64
 import io
-import tempfile
 from pathlib import Path
 from typing import Any, List, Optional, Union
 
@@ -249,7 +248,7 @@ class VisionModelWithCompression:
         try:
             image = Image.open(io.BytesIO(compressed_data))
             mime_type = f"image/{image.format.lower()}" if image.format else "image/jpeg"
-        except:
+        except Exception:
             mime_type = "image/jpeg"
 
         return f"data:{mime_type};base64,{base64_data}"
@@ -269,7 +268,7 @@ class VisionModelWithCompression:
         try:
             image = Image.open(io.BytesIO(compressed_data))
             mime_type = f"image/{image.format.lower()}" if image.format else "image/jpeg"
-        except:
+        except Exception:
             mime_type = "image/jpeg"
 
         return f"data:{mime_type};base64,{base64_data}"
@@ -296,7 +295,7 @@ class VisionModelWithCompression:
         try:
             image = Image.open(io.BytesIO(compressed_data))
             mime_type = f"image/{image.format.lower()}" if image.format else "image/jpeg"
-        except:
+        except Exception:
             mime_type = "image/jpeg"
 
         return f"data:{mime_type};base64,{base64_data}"
