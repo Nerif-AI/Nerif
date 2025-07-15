@@ -63,7 +63,22 @@ jobs:
     - name: Build package
       run: python -m build
     
+    - name: Check if GitHub Release exists
+      id: check_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        VERSION=${{ needs.check-version.outputs.new_version }}
+        if gh release view "v$VERSION" >/dev/null 2>&1; then
+          echo "Release v$VERSION already exists, skipping GitHub release creation"
+          echo "release_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "Release v$VERSION does not exist, will create"
+          echo "release_exists=false" >> $GITHUB_OUTPUT
+        fi
+    
     - name: Create GitHub Release
+      if: steps.check_release.outputs.release_exists == 'false'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -73,7 +88,23 @@ jobs:
           --notes "Release version $VERSION" \
           dist/*
     
+    - name: Check if version exists on PyPI
+      id: check_pypi
+      run: |
+        VERSION=${{ needs.check-version.outputs.new_version }}
+        PACKAGE_NAME=$(grep 'name = ' pyproject.toml | head -1 | sed 's/name = "\(.*\)"/\1/')
+        
+        # Check if version exists on PyPI
+        if pip index versions "$PACKAGE_NAME" 2>/dev/null | grep -q "$VERSION"; then
+          echo "Version $VERSION already exists on PyPI, skipping publish"
+          echo "version_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "Version $VERSION does not exist on PyPI, will publish"
+          echo "version_exists=false" >> $GITHUB_OUTPUT
+        fi
+    
     - name: Publish to PyPI
+      if: steps.check_pypi.outputs.version_exists == 'false'
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         verbose: true
