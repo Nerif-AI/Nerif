@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.0.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,7 +8,9 @@ version = "0.10.1"
 
 description = "LLM powered Python"
 readme = "README.md"
-authors = [{ name = "Chivier Humber" }]
+authors = [
+    {name = "Chivier Humber", email = "chivier.humber@outlook.com"}
+]
 license = { file = "LICENSE" }
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
@@ -28,6 +30,12 @@ dependencies = [
 ]
 requires-python = ">=3.8"
 
+[tool.hatch.build.targets.wheel]
+package-dir = ["nerif"]
+
+[tool.hatch.build]
+directory = "nerif"
+
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
 
@@ -36,13 +44,14 @@ dev = ["bumpver", "ruff", "pip-tools", "pytest", "ipython", "isort"]
 image = ["Pillow>=9.0.0"]
 
 [project.urls]
-Homepage = "https://github.com/Nerif-AI/nerif"
+Homepage = "https://nerif-ai.com"
 
 [tool.bumpver]
 current_version = "0.10.1"
 
+
 version_pattern = "MAJOR.MINOR.PATCH"
-commit_message = "Bump version {old_version} -> {new_version}"
+commit_message = "release: Bump version {old_version} -> {new_version}"
 commit = true
 tag = true
 push = false
