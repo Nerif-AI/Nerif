@@ -28,23 +28,26 @@ idx = nerif_match_string(selections=choices, text="The weather is warm and brigh
 print(f"Best match: {choices[idx]}")
 ```
 
-You can get start with [examples](./category/start-with-examples)
+You can get started with [examples](./category/start-with-examples)
 :::
 
 ## Intro
 
 Using Large Language Models (LLMs) can often yield unpredictable results. They may produce excessively polite responses that, while technically correct, don't always align with the context. When faced with uncertainty, LLMs might display human-like confusion, offering detailed explanations of their thought processes instead of clear answers—an approach that isn't always useful for end-users.
 
-To tackle these challenges, we're excited to introduce Nerif. This tool seamlessly integrates LLMs with Python programming, aiming to set a new standard in AI-driven development. Our goal is not only to match but potentially surpass existing frameworks like Langchain, Dify, and other leading AI agent programming methodologies.
+To tackle these challenges, we introduce **Nerif**. This tool seamlessly integrates LLMs with Python programming, providing a reliable bridge between natural language and structured code.
 
-Our objectives with Nerif are clear:
+### Key Features
 
-- Empower developers to harness LLMs in their projects exactly as they envision.
-- Ensure that LLM outputs are properly formatted into programmable types for seamless integration.
-- Introduce innovative metrics like token_cost and pass_rate to help developers refine the quality of their AI agents' prompts.
-- Provide multi-modal support (vision, audio) and tool calling for building AI agents.
-
-By focusing on these key points, we aim to significantly enhance the utility and efficiency of LLMs in programming environments, making them more accessible and effective for developers worldwide.
+- **Natural language judgment** — `nerif("statement")` returns `True` or `False`
+- **Option matching** — `nerif_match_string(selections, text)` returns the best match index
+- **Format verification** — Extract `int`, `float`, `list`, JSON, and more from LLM outputs
+- **Multi-modal input** — Send images, audio, and video alongside text using `MultiModalMessage`
+- **Tool calling** — Define tools with `ToolDefinition` and let the model call them
+- **Structured output** — Get JSON responses with `response_format={"type": "json_object"}`
+- **Agent framework** — `NerifAgent` runs ReAct-style tool-calling loops automatically
+- **Token tracking** — Monitor token usage with `NerifTokenCounter`
+- **Batch processing** — Process large volumes of requests with the OpenAI-compatible Batch API
 
 ## Installation
 
@@ -60,8 +63,8 @@ Nerif uses a standard Python `src/` layout:
 Nerif/
 ├── src/nerif/          # Python source package
 │   ├── core/           # nerif(), nerif_match(), Nerification
-│   ├── model/          # SimpleChatModel, LogitsChatModel, VisionModel
-│   ├── agent/          # Tool calling and agent framework
+│   ├── model/          # SimpleChatModel, LogitsChatModel, VisionModel, VideoModel
+│   ├── agent/          # NerifAgent, Tool - ReAct-style tool calling agent
 │   ├── batch/          # Batch API processing
 │   ├── utils/          # Format verification, token counting, logging
 │   └── cli/            # Command-line utilities
@@ -70,4 +73,3 @@ Nerif/
 ├── examples/           # Usage examples
 └── pyproject.toml      # Build configuration
 ```
-
