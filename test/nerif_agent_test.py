@@ -1,9 +1,6 @@
 """Tests for the agent module."""
 
-import json
-from unittest.mock import MagicMock, patch
 
-import pytest
 
 from nerif.agent import NerifAgent, Tool, tool
 

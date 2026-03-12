@@ -164,4 +164,8 @@ debug
 set_key.sh
 
 .claude
-CLAUDE.md
+
+# Docusaurus
+docs/node_modules/
+docs/.docusaurus/
+docs/build/
