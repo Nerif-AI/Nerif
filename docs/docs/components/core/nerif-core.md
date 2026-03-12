@@ -125,8 +125,16 @@ The Nerif class evaluates the truthfulness of statements using both logits and e
 Example:
 
 ```python
+from nerif.core import Nerif, nerif
 
+# Quick one-shot usage
+result = nerif("the sky is blue")
+print(result)  # True
 
+# Instance-based usage with custom model
+judge = Nerif(model="gpt-4o", debug=True)
+result = judge.judge("Python is a compiled language")
+print(result)  # False
 ```
 
 ### Nerif Match Class
@@ -149,7 +157,17 @@ The Nerif Match class selects the best matching option from a list of choices.
 Example:
 
 ```python
+from nerif.core import NerifMatchString, nerif_match_string
 
+# Quick one-shot usage
+choices = ["iPhone 5", "iPhone 6", "iPhone 12"]
+idx = nerif_match_string(selections=choices, text="Which iPhone is the most powerful one?")
+print(f"Best match: {choices[idx]}")  # iPhone 12
+
+# Instance-based usage
+matcher = NerifMatchString(choices=["sunny", "rainy", "cloudy"])
+idx = matcher.match("The weather is warm and bright")
+print(f"Weather: {choices[idx]}")
 ```
 
 ### Instant Mode

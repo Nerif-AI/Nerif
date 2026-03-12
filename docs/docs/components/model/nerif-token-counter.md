@@ -11,7 +11,7 @@ Counting token consumed by specific model or request method like `nerif()`
 A counter should be create seperately, and pass it into constructor of model class or special methods.
 
 ```python
-from nerif.model import NerifTokenCounter
+from nerif.model import NerifTokenCounter, SimpleChatModel
 from nerif.core import nerif
 
 counter = NerifTokenCounter()
@@ -19,7 +19,7 @@ counter = NerifTokenCounter()
 if nerif("the sky is blue", counter=counter):
     print("True")
 
-model = nerif.model.SimpleChatModel(counter=counter)
+model = SimpleChatModel(counter=counter)
 
 print(counter.model_token)
 ```
@@ -43,7 +43,7 @@ Methods:
 Example:
 
 ```python
-from nerif.model import NerifTokenCounter
+from nerif.model import NerifTokenCounter, SimpleChatModel
 from nerif.core import nerif
 
 counter = NerifTokenCounter()
@@ -51,7 +51,7 @@ counter = NerifTokenCounter()
 if nerif("the sky is blue", counter=counter):
     print("True")
 
-model = nerif.model.SimpleChatModel(counter=counter)
+model = SimpleChatModel(counter=counter)
 
 print(counter.model_token)
 
