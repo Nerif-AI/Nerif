@@ -13,7 +13,7 @@ class TestOllamaEmbeddingModel(unittest.TestCase):
         self.test_text = "This is a test sentence for embedding."
         self.test_embedding = [0.1, 0.2, 0.3, 0.4, 0.5]  # Mock embedding vector
 
-    @patch('nerif.model.model.get_litellm_embedding')
+    @patch('nerif.model.model.get_embedding')
     def test_ollama_embedding_default_model(self, mock_get_embedding):
         """Test OllamaEmbeddingModel with default model"""
         # Setup mock
@@ -34,7 +34,7 @@ class TestOllamaEmbeddingModel(unittest.TestCase):
             counter=None,
         )
 
-    @patch('nerif.model.model.get_litellm_embedding')
+    @patch('nerif.model.model.get_embedding')
     def test_ollama_embedding_custom_model(self, mock_get_embedding):
         """Test OllamaEmbeddingModel with custom model"""
         # Setup mock
@@ -58,7 +58,7 @@ class TestOllamaEmbeddingModel(unittest.TestCase):
             counter=None,
         )
 
-    @patch('nerif.model.model.get_litellm_embedding')
+    @patch('nerif.model.model.get_embedding')
     def test_ollama_embedding_with_counter(self, mock_get_embedding):
         """Test OllamaEmbeddingModel with token counter"""
         # Setup mock
@@ -80,7 +80,7 @@ class TestOllamaEmbeddingModel(unittest.TestCase):
             counter=counter,
         )
 
-    @patch('nerif.model.model.get_litellm_embedding')
+    @patch('nerif.model.model.get_embedding')
     def test_ollama_embedding_all_minilm(self, mock_get_embedding):
         """Test OllamaEmbeddingModel with all-minilm model"""
         # Setup mock

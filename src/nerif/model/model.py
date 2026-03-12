@@ -8,9 +8,9 @@ from ..utils import (
     OPENAI_MODEL,
     MessageType,
     NerifTokenCounter,
-    get_litellm_embedding,
-    get_litellm_response,
+    get_embedding,
     get_model_response,
+    get_response,
 )
 
 
@@ -242,7 +242,7 @@ class SimpleEmbeddingModel:
         self.counter = counter
 
     def embed(self, string: str) -> List[float]:
-        result = get_litellm_embedding(
+        result = get_embedding(
             messages=string,
             model=self.model,
             counter=self.counter,
@@ -292,7 +292,7 @@ class LogitsChatModel:
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
         if self.model in OPENAI_MODEL:
-            result = get_litellm_response(
+            result = get_response(
                 self.messages,
                 model=self.model,
                 temperature=self.temperature,
@@ -323,7 +323,7 @@ class OllamaEmbeddingModel:
         self.counter = counter
 
     def embed(self, string: str) -> List[float]:
-        result = get_litellm_embedding(
+        result = get_embedding(
             messages=string,
             model=self.model,
             base_url=self.url,
@@ -402,7 +402,7 @@ class VisionModel:
 
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
-        result = get_litellm_response(
+        result = get_response(
             self.messages,
             model=self.model,
             temperature=self.temperature,

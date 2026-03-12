@@ -22,9 +22,7 @@ dependencies = [
     "requests",
     "numpy",
     "httpx",
-    "openai",
     "python-dotenv",
-    "litellm",
     "prettytable",
     "Pillow>=9.0.0",
 ]
@@ -40,6 +38,7 @@ pythonpath = ["src"]
 [project.optional-dependencies]
 dev = ["bumpver", "ruff", "pip-tools", "pytest", "ipython", "isort"]
 image = ["Pillow>=9.0.0"]
+native = ["nerif_native"]
 
 [project.urls]
 Homepage = "https://nerif-ai.com"

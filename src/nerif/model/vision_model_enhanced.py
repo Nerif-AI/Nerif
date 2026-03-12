@@ -12,7 +12,7 @@ from ..utils import (
     ImageCompressor,
     MessageType,
     NerifTokenCounter,
-    get_litellm_response,
+    get_response,
 )
 
 
@@ -433,7 +433,7 @@ class VisionModelWithCompression:
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
         try:
-            result = get_litellm_response(
+            result = get_response(
                 self.messages,
                 model=self.model,
                 temperature=self.temperature,
