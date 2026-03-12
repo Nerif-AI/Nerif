@@ -31,13 +31,11 @@ dependencies = [
 requires-python = ">=3.10"
 
 [tool.hatch.build.targets.wheel]
-package-dir = ["nerif"]
-
-[tool.hatch.build]
-directory = "nerif"
+packages = ["src/nerif"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
+pythonpath = ["src"]
 
 [project.optional-dependencies]
 dev = ["bumpver", "ruff", "pip-tools", "pytest", "ipython", "isort"]
