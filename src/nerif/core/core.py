@@ -1,15 +1,21 @@
 from typing import Any, List, Optional
 
-import litellm
-
 from ..model import LogitsChatModel, SimpleChatModel, SimpleEmbeddingModel
-from ..utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, NerifTokenCounter, similarity_dist
+from ..utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, OPENAI_MODEL, NerifTokenCounter, similarity_dist
+
+# Models known to support the logprobs parameter
+_LOGPROBS_SUPPORTED_MODELS = set(OPENAI_MODEL)
 
 
 def support_logit_mode(model_name):
-    response = litellm.get_supported_openai_params(model=model_name)
-    if "logprob" in response:
+    # Check exact match
+    if model_name in _LOGPROBS_SUPPORTED_MODELS:
         return True
+    # Check if it's an OpenRouter-wrapped OpenAI model
+    if model_name.startswith("openrouter/openai/"):
+        bare = model_name[len("openrouter/openai/"):]
+        if bare in _LOGPROBS_SUPPORTED_MODELS:
+            return True
     return False
 
 

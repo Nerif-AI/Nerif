@@ -269,7 +269,7 @@ class TestVisionModelWithCompression(unittest.TestCase):
         # Should preserve transparency capability
         self.assertIn(decoded_img.mode, ["RGBA", "P"])
 
-    @patch("nerif.model.vision_model_enhanced.get_litellm_response")
+    @patch("nerif.model.vision_model_enhanced.get_response")
     def test_chat_functionality(self, mock_get_response):
         """Test the chat functionality with images."""
         # Mock LLM response

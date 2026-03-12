@@ -1,0 +1,13 @@
+[package]
+name = "nerif_native"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "nerif_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+base64 = "0.22"

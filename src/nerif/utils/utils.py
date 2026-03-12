@@ -1,11 +1,11 @@
 import logging
 import os
+from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-import litellm
+import httpx
 import numpy as np
-from openai import OpenAI
 
 from .token_counter import NerifTokenCounter
 
@@ -85,6 +85,9 @@ OPENAI_EMBEDDING_MODEL: List[str] = [
 
 LOGGER = logging.getLogger("Nerif")
 
+# Default httpx timeout (30 seconds connect, 120 seconds read for LLM responses)
+_DEFAULT_TIMEOUT = httpx.Timeout(30.0, read=120.0)
+
 
 class MessageType(Enum):
     IMAGE_PATH = auto()
@@ -98,57 +101,462 @@ class MessageType(Enum):
     VIDEO_URL = auto()
 
 
-def _build_model_kwargs(
+# ---------------------------------------------------------------------------
+# Lightweight response dataclasses that mirror OpenAI/litellm response shapes
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _Usage:
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+@dataclass
+class _FunctionCall:
+    name: str = ""
+    arguments: str = ""
+
+
+@dataclass
+class _ToolCall:
+    id: str = ""
+    type: str = "function"
+    function: _FunctionCall = field(default_factory=_FunctionCall)
+
+
+@dataclass
+class _Message:
+    role: str = "assistant"
+    content: Optional[str] = None
+    tool_calls: Optional[List[_ToolCall]] = None
+
+
+@dataclass
+class _LogprobContent:
+    token: str = ""
+    logprob: float = 0.0
+    bytes: Optional[List[int]] = None
+    top_logprobs: Optional[List[Dict[str, Any]]] = None
+
+
+@dataclass
+class _Logprobs:
+    content: Optional[List[Dict[str, Any]]] = None
+
+
+@dataclass
+class _Choice:
+    index: int = 0
+    message: _Message = field(default_factory=_Message)
+    finish_reason: Optional[str] = None
+    logprobs: Optional[Any] = None
+
+
+@dataclass
+class ChatCompletionResponse:
+    id: str = ""
+    object: str = "chat.completion"
+    created: int = 0
+    model: str = ""
+    choices: List[_Choice] = field(default_factory=list)
+    usage: _Usage = field(default_factory=_Usage)
+
+
+@dataclass
+class _EmbeddingData:
+    object: str = "embedding"
+    embedding: List[float] = field(default_factory=list)
+    index: int = 0
+
+
+@dataclass
+class EmbeddingResponse:
+    object: str = "list"
+    model: str = ""
+    data: List[Dict[str, Any]] = field(default_factory=list)
+    usage: _Usage = field(default_factory=_Usage)
+
+
+# ---------------------------------------------------------------------------
+# Provider routing helpers
+# ---------------------------------------------------------------------------
+
+
+def _resolve_endpoint(
     model: str,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
-) -> dict:
-    """Build kwargs dict for litellm based on model name prefix."""
-    kwargs = {"model": model}
+) -> tuple:
+    """Return (effective_base_url, effective_api_key, effective_model, provider) for a model string."""
+
+    provider = "openai"
 
     if model.startswith("custom_openai/"):
-        kwargs["api_key"] = api_key if (api_key and api_key != "") else OPENAI_API_KEY
-        kwargs["base_url"] = base_url if (base_url and base_url != "") else OPENAI_API_BASE
-    elif model in OPENAI_MODEL or model in OPENAI_EMBEDDING_MODEL:
-        kwargs["api_key"] = api_key if (api_key and api_key != "") else OPENAI_API_KEY
-        kwargs["base_url"] = base_url if (base_url and base_url != "") else OPENAI_API_BASE
+        effective_model = model[len("custom_openai/"):]
+        effective_key = api_key or OPENAI_API_KEY or ""
+        effective_base = base_url or OPENAI_API_BASE or "https://api.openai.com/v1"
+        provider = "openai_compat"
     elif model.startswith("anthropic/"):
-        kwargs["api_key"] = api_key if (api_key and api_key != "") else ANTHROPIC_API_KEY
+        effective_model = model[len("anthropic/"):]
+        effective_key = api_key or ANTHROPIC_API_KEY or ""
+        effective_base = base_url or "https://api.anthropic.com"
+        provider = "anthropic"
     elif model.startswith("gemini/"):
-        kwargs["api_key"] = api_key if (api_key and api_key != "") else GOOGLE_API_KEY
-    elif model.startswith("openrouter"):
-        pass  # litellm handles openrouter natively
-    elif model.startswith("ollama"):
-        pass  # litellm handles ollama/ prefix natively
-    elif model.startswith("vllm"):
-        pass  # litellm handles vllm/ prefix natively
-    elif model.startswith("sllm"):
-        pass  # litellm handles sllm/ prefix natively
+        effective_model = model[len("gemini/"):]
+        effective_key = api_key or GOOGLE_API_KEY or ""
+        effective_base = base_url or "https://generativelanguage.googleapis.com"
+        provider = "gemini"
+    elif model.startswith("openrouter/"):
+        effective_model = model[len("openrouter/"):]
+        effective_key = api_key or OPENROUTER_API_KEY or ""
+        effective_base = base_url or "https://openrouter.ai/api/v1"
+        provider = "openai_compat"
+    elif model.startswith("ollama/"):
+        effective_model = model[len("ollama/"):]
+        effective_key = api_key or OLLAMA_API_KEY or "ollama"
+        effective_base = base_url or OLLAMA_URL or "http://localhost:11434/v1"
+        provider = "openai_compat"
+    elif model.startswith("vllm/"):
+        effective_model = model[len("vllm/"):]
+        effective_key = api_key or VLLM_API_KEY or "token-abc123"
+        effective_base = base_url or VLLM_URL or "http://localhost:8000/v1"
+        provider = "openai_compat"
+    elif model.startswith("sllm/"):
+        effective_model = model[len("sllm/"):]
+        effective_key = api_key or SLLM_API_KEY or "token-abc123"
+        effective_base = base_url or SLLM_URL or "http://localhost:8343/v1"
+        provider = "openai_compat"
+    elif model in OPENAI_MODEL or model in OPENAI_EMBEDDING_MODEL:
+        effective_model = model
+        effective_key = api_key or OPENAI_API_KEY or ""
+        effective_base = base_url or OPENAI_API_BASE or "https://api.openai.com/v1"
+        provider = "openai"
     else:
-        # default: pass through api_key/base_url if provided
-        if api_key and api_key != "":
-            kwargs["api_key"] = api_key
-        if base_url and base_url != "":
-            kwargs["base_url"] = base_url
+        # Default: treat as OpenAI-compatible
+        effective_model = model
+        effective_key = api_key or OPENAI_API_KEY or ""
+        effective_base = base_url or OPENAI_API_BASE or "https://api.openai.com/v1"
+        provider = "openai"
 
-    return kwargs
+    # Ensure base URL doesn't end with trailing slash for consistent joining
+    effective_base = effective_base.rstrip("/")
+
+    return effective_base, effective_key, effective_model, provider
 
 
-def get_litellm_embedding(
+# ---------------------------------------------------------------------------
+# Anthropic-specific helpers
+# ---------------------------------------------------------------------------
+
+
+def _anthropic_completion(
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: List[Any],
+    temperature: float = 0,
+    max_tokens: Optional[int] = None,
+    stream: bool = False,
+    tools: Optional[List[Any]] = None,
+    tool_choice: Optional[Any] = None,
+) -> ChatCompletionResponse:
+    """Call the Anthropic Messages API and return a ChatCompletionResponse."""
+    url = f"{base_url}/v1/messages"
+
+    # Separate system message from conversation
+    system_text = None
+    conversation = []
+    for msg in messages:
+        if msg.get("role") == "system":
+            system_text = msg.get("content", "")
+        else:
+            conversation.append(msg)
+
+    body: Dict[str, Any] = {
+        "model": model,
+        "messages": conversation,
+        "max_tokens": max_tokens or 4096,
+    }
+    if system_text:
+        body["system"] = system_text
+    if temperature is not None:
+        body["temperature"] = temperature
+
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+
+    resp = httpx.post(url, json=body, headers=headers, timeout=_DEFAULT_TIMEOUT)
+    resp.raise_for_status()
+    data = resp.json()
+
+    # Map Anthropic response to ChatCompletionResponse
+    content_text = ""
+    for block in data.get("content", []):
+        if block.get("type") == "text":
+            content_text += block.get("text", "")
+
+    usage_data = data.get("usage", {})
+    return ChatCompletionResponse(
+        id=data.get("id", ""),
+        model=data.get("model", model),
+        choices=[
+            _Choice(
+                index=0,
+                message=_Message(role="assistant", content=content_text),
+                finish_reason=data.get("stop_reason", "end_turn"),
+            )
+        ],
+        usage=_Usage(
+            prompt_tokens=usage_data.get("input_tokens", 0),
+            completion_tokens=usage_data.get("output_tokens", 0),
+            total_tokens=usage_data.get("input_tokens", 0) + usage_data.get("output_tokens", 0),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Gemini-specific helpers
+# ---------------------------------------------------------------------------
+
+
+def _gemini_completion(
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: List[Any],
+    temperature: float = 0,
+    max_tokens: Optional[int] = None,
+    stream: bool = False,
+) -> ChatCompletionResponse:
+    """Call the Google Gemini API and return a ChatCompletionResponse."""
+    url = f"{base_url}/v1beta/models/{model}:generateContent?key={api_key}"
+
+    # Convert OpenAI-style messages to Gemini format
+    system_instruction = None
+    contents = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "system":
+            system_instruction = content
+        else:
+            gemini_role = "model" if role == "assistant" else "user"
+            contents.append({"role": gemini_role, "parts": [{"text": content}]})
+
+    body: Dict[str, Any] = {"contents": contents}
+    if system_instruction:
+        body["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+    generation_config: Dict[str, Any] = {}
+    if temperature is not None:
+        generation_config["temperature"] = temperature
+    if max_tokens is not None:
+        generation_config["maxOutputTokens"] = max_tokens
+    if generation_config:
+        body["generationConfig"] = generation_config
+
+    headers = {"content-type": "application/json"}
+
+    resp = httpx.post(url, json=body, headers=headers, timeout=_DEFAULT_TIMEOUT)
+    resp.raise_for_status()
+    data = resp.json()
+
+    # Map Gemini response to ChatCompletionResponse
+    content_text = ""
+    candidates = data.get("candidates", [])
+    if candidates:
+        parts = candidates[0].get("content", {}).get("parts", [])
+        for part in parts:
+            content_text += part.get("text", "")
+
+    usage_meta = data.get("usageMetadata", {})
+    return ChatCompletionResponse(
+        id="",
+        model=model,
+        choices=[
+            _Choice(
+                index=0,
+                message=_Message(role="assistant", content=content_text),
+                finish_reason="stop",
+            )
+        ],
+        usage=_Usage(
+            prompt_tokens=usage_meta.get("promptTokenCount", 0),
+            completion_tokens=usage_meta.get("candidatesTokenCount", 0),
+            total_tokens=usage_meta.get("totalTokenCount", 0),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible completion/embedding (covers OpenAI, OpenRouter, Ollama, vLLM, sllm, custom)
+# ---------------------------------------------------------------------------
+
+
+def _parse_chat_response(data: dict, model_name: str) -> ChatCompletionResponse:
+    """Parse an OpenAI-compatible JSON response into ChatCompletionResponse."""
+    choices = []
+    for c in data.get("choices", []):
+        msg_data = c.get("message", {})
+
+        # Parse tool calls if present
+        tool_calls = None
+        if msg_data.get("tool_calls"):
+            tool_calls = []
+            for tc in msg_data["tool_calls"]:
+                func = tc.get("function", {})
+                tool_calls.append(
+                    _ToolCall(
+                        id=tc.get("id", ""),
+                        type=tc.get("type", "function"),
+                        function=_FunctionCall(
+                            name=func.get("name", ""),
+                            arguments=func.get("arguments", ""),
+                        ),
+                    )
+                )
+
+        # Parse logprobs if present
+        logprobs_data = c.get("logprobs")
+
+        choices.append(
+            _Choice(
+                index=c.get("index", 0),
+                message=_Message(
+                    role=msg_data.get("role", "assistant"),
+                    content=msg_data.get("content"),
+                    tool_calls=tool_calls,
+                ),
+                finish_reason=c.get("finish_reason"),
+                logprobs=logprobs_data,
+            )
+        )
+
+    usage_data = data.get("usage", {})
+    return ChatCompletionResponse(
+        id=data.get("id", ""),
+        object=data.get("object", "chat.completion"),
+        created=data.get("created", 0),
+        model=data.get("model", model_name),
+        choices=choices,
+        usage=_Usage(
+            prompt_tokens=usage_data.get("prompt_tokens", 0),
+            completion_tokens=usage_data.get("completion_tokens", 0),
+            total_tokens=usage_data.get("total_tokens", 0),
+        ),
+    )
+
+
+def _openai_compatible_completion(
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: List[Any],
+    temperature: float = 0,
+    max_tokens: Optional[int] = None,
+    stream: bool = False,
+    logprobs: bool = False,
+    top_logprobs: int = 5,
+    tools: Optional[List[Any]] = None,
+    tool_choice: Optional[Any] = None,
+    response_format: Optional[Any] = None,
+) -> ChatCompletionResponse:
+    """Make a chat completion request to an OpenAI-compatible endpoint."""
+    url = f"{base_url}/chat/completions"
+
+    body: Dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "stream": False,  # We don't support streaming in this implementation
+    }
+    if temperature is not None:
+        body["temperature"] = temperature
+    if max_tokens is not None:
+        body["max_tokens"] = max_tokens
+    if logprobs:
+        body["logprobs"] = True
+        body["top_logprobs"] = top_logprobs
+    if tools is not None:
+        body["tools"] = tools
+    if tool_choice is not None:
+        body["tool_choice"] = tool_choice
+    if response_format is not None:
+        body["response_format"] = response_format
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    resp = httpx.post(url, json=body, headers=headers, timeout=_DEFAULT_TIMEOUT)
+    resp.raise_for_status()
+    data = resp.json()
+
+    return _parse_chat_response(data, model)
+
+
+def _openai_compatible_embedding(
+    base_url: str,
+    api_key: str,
+    model: str,
+    input_text: Union[str, List[str]],
+) -> EmbeddingResponse:
+    """Make an embedding request to an OpenAI-compatible endpoint."""
+    url = f"{base_url}/embeddings"
+
+    body: Dict[str, Any] = {
+        "model": model,
+        "input": input_text,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    resp = httpx.post(url, json=body, headers=headers, timeout=_DEFAULT_TIMEOUT)
+    resp.raise_for_status()
+    data = resp.json()
+
+    embedding_data = []
+    for item in data.get("data", []):
+        embedding_data.append({"embedding": item.get("embedding", []), "index": item.get("index", 0)})
+
+    usage_data = data.get("usage", {})
+    return EmbeddingResponse(
+        model=data.get("model", model),
+        data=embedding_data,
+        usage=_Usage(
+            prompt_tokens=usage_data.get("prompt_tokens", 0),
+            completion_tokens=usage_data.get("completion_tokens", 0),
+            total_tokens=usage_data.get("total_tokens", 0),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public API functions
+# ---------------------------------------------------------------------------
+
+
+def get_embedding(
     messages: str,
     model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     counter: Optional[NerifTokenCounter] = None,
 ) -> Any:
-    kargs = _build_model_kwargs(model, api_key, base_url)
-    kargs["input"] = messages
+    effective_base, effective_key, effective_model, provider = _resolve_endpoint(model, api_key, base_url)
 
     # For embedding, override base_url if explicitly provided
     if base_url and base_url != "":
-        kargs["base_url"] = base_url
+        effective_base = base_url.rstrip("/")
 
-    response = litellm.embedding(**kargs)
+    response = _openai_compatible_embedding(effective_base, effective_key, effective_model, messages)
 
     if counter is not None:
         counter.set_parser_based_on_model(model)
@@ -174,7 +582,6 @@ def get_model_response(
 ) -> Any:
     """
     Unified model response function. Routes to the correct backend based on model name prefix.
-    Supports all backends that litellm supports (OpenAI, Anthropic, Gemini, Ollama, vLLM, etc.).
 
     Parameters:
     - messages (list): The list of messages to send to the model.
@@ -194,49 +601,46 @@ def get_model_response(
     Returns:
     - The model response object.
     """
-    kargs = _build_model_kwargs(model, api_key, base_url)
-    kargs["messages"] = messages
-    kargs["stream"] = stream
-    kargs["temperature"] = temperature
-    kargs["max_tokens"] = max_tokens
+    effective_base, effective_key, effective_model, provider = _resolve_endpoint(model, api_key, base_url)
 
-    if logprobs:
-        kargs["logprobs"] = logprobs
-        kargs["top_logprobs"] = top_logprobs
-
-    if tools is not None:
-        kargs["tools"] = tools
-    if tool_choice is not None:
-        kargs["tool_choice"] = tool_choice
-    if response_format is not None:
-        kargs["response_format"] = response_format
-
-    # For custom_openai/ prefix, bypass litellm and use OpenAI client directly.
-    # This is useful for proxies that only support /v1/chat/completions
-    # (e.g. when litellm routes GPT-5 models to /v1/responses).
-    if model.startswith("custom_openai/"):
-        actual_model = model[len("custom_openai/"):]
-        client_api_key = kargs.get("api_key") or OPENAI_API_KEY
-        client_base_url = kargs.get("base_url") or OPENAI_API_BASE
-        client = OpenAI(api_key=client_api_key, base_url=client_base_url)
-        oai_kwargs = {
-            "model": actual_model,
-            "messages": messages,
-            "stream": stream,
-        }
-        if temperature is not None:
-            oai_kwargs["temperature"] = temperature
-        if max_tokens is not None:
-            oai_kwargs["max_tokens"] = max_tokens
-        if tools is not None:
-            oai_kwargs["tools"] = tools
-        if tool_choice is not None:
-            oai_kwargs["tool_choice"] = tool_choice
-        if response_format is not None:
-            oai_kwargs["response_format"] = response_format
-        responses = client.chat.completions.create(**oai_kwargs)
+    if provider == "anthropic":
+        responses = _anthropic_completion(
+            base_url=effective_base,
+            api_key=effective_key,
+            model=effective_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=stream,
+            tools=tools,
+            tool_choice=tool_choice,
+        )
+    elif provider == "gemini":
+        responses = _gemini_completion(
+            base_url=effective_base,
+            api_key=effective_key,
+            model=effective_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=stream,
+        )
     else:
-        responses = litellm.completion(**kargs)
+        # OpenAI-compatible (openai, openai_compat, openrouter, ollama, vllm, sllm)
+        responses = _openai_compatible_completion(
+            base_url=effective_base,
+            api_key=effective_key,
+            model=effective_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=stream,
+            logprobs=logprobs,
+            top_logprobs=top_logprobs,
+            tools=tools,
+            tool_choice=tool_choice,
+            response_format=response_format,
+        )
 
     if counter is not None:
         counter.set_parser_based_on_model(model)
@@ -245,7 +649,10 @@ def get_model_response(
     return responses
 
 
-# Backward-compatible alias
+# Backward-compatible aliases
+get_litellm_embedding = get_embedding
+
+
 def get_litellm_response(
     messages: List[Any],
     model: str = NERIF_DEFAULT_LLM_MODEL,
@@ -270,6 +677,39 @@ def get_litellm_response(
         logprobs=logprobs,
         top_logprobs=top_logprobs,
         counter=counter,
+    )
+
+
+def get_response(
+    messages: List[Any],
+    model: str = NERIF_DEFAULT_LLM_MODEL,
+    temperature: float = 0,
+    max_tokens: int | None = None,
+    stream: bool = False,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    logprobs: bool = False,
+    top_logprobs: int = 5,
+    counter: Optional[NerifTokenCounter] = None,
+    tools: Optional[List[Any]] = None,
+    tool_choice: Optional[Any] = None,
+    response_format: Optional[Any] = None,
+) -> Any:
+    """Alias for get_model_response()."""
+    return get_model_response(
+        messages=messages,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        stream=stream,
+        api_key=api_key,
+        base_url=base_url,
+        logprobs=logprobs,
+        top_logprobs=top_logprobs,
+        counter=counter,
+        tools=tools,
+        tool_choice=tool_choice,
+        response_format=response_format,
     )
 
 
@@ -309,21 +749,19 @@ def get_vllm_response(
     api_key: Optional[str] = None,
     counter: Optional[NerifTokenCounter] = None,
 ) -> Union[str, List[str]]:
-    """Backward-compatible vLLM wrapper. Uses OpenAI client directly for vLLM."""
+    """Backward-compatible vLLM wrapper."""
     if url is None or url == "":
         url = "http://localhost:8000/v1"
     if api_key is None or api_key == "":
         api_key = "token-abc123"
 
-    model = "/".join(model.split("/")[1:])
+    actual_model = "/".join(model.split("/")[1:])
 
-    client = OpenAI(
-        base_url=url,
+    effective_base = url.rstrip("/")
+    response = _openai_compatible_completion(
+        base_url=effective_base,
         api_key=api_key,
-    )
-
-    response = client.chat.completions.create(
-        model=model,
+        model=actual_model,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -347,21 +785,19 @@ def get_sllm_response(
     api_key: Optional[str] = None,
     counter: Optional[NerifTokenCounter] = None,
 ) -> Union[str, List[str]]:
-    """Backward-compatible SLLM wrapper. Uses OpenAI client directly for SLLM."""
+    """Backward-compatible SLLM wrapper."""
     if url is None or url == "":
         url = "http://localhost:8343/v1"
     if api_key is None or api_key == "":
         api_key = "token-abc123"
 
-    model = "/".join(model.split("/")[1:])
+    actual_model = "/".join(model.split("/")[1:])
 
-    client = OpenAI(
-        base_url=url,
+    effective_base = url.rstrip("/")
+    response = _openai_compatible_completion(
+        base_url=effective_base,
         api_key=api_key,
-    )
-
-    response = client.chat.completions.create(
-        model=model,
+        model=actual_model,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
