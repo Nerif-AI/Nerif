@@ -12,8 +12,8 @@ Prerequisites:
 """
 
 import numpy as np
+
 from nerif.model import OllamaEmbeddingModel
-from nerif.utils import similarity_dist
 
 
 def cosine_similarity(vec1, vec2):

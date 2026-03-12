@@ -1,11 +1,8 @@
 """Tests for tool calling and structured output features."""
 
-import json
-from unittest.mock import MagicMock, patch
 
-import pytest
 
-from nerif.model.model import MultiModalMessage, SimpleChatModel, ToolCallResult, ToolDefinition
+from nerif.model.model import MultiModalMessage, ToolCallResult, ToolDefinition
 from nerif.utils.format import FormatVerifierJson, NerifFormat
 
 
