@@ -1,3 +1,4 @@
+import json
 import re
 
 
@@ -164,6 +165,39 @@ class FormatVerifierStringList(FormatVerifierBase):
         return res
 
 
+class FormatVerifierJson(FormatVerifierBase):
+    cls = dict
+    simple = False
+    pattern = re.compile(r"\{[\s\S]*\}", re.DOTALL)
+
+    def verify(self, val: str) -> bool:
+        try:
+            json.loads(val)
+            return True
+        except (json.JSONDecodeError, TypeError):
+            return False
+
+    def match(self, val: str):
+        candidate = self.pattern.search(val)
+        if candidate:
+            try:
+                return json.loads(candidate.group())
+            except json.JSONDecodeError:
+                pass
+        # Try to find JSON array
+        array_pattern = re.compile(r"\[[\s\S]*\]", re.DOTALL)
+        candidate = array_pattern.search(val)
+        if candidate:
+            try:
+                return json.loads(candidate.group())
+            except json.JSONDecodeError:
+                pass
+        return None
+
+    def convert(self, val: str):
+        return json.loads(val)
+
+
 class NerifFormat:
     """
     Convert llm response to given type
@@ -178,4 +212,28 @@ class NerifFormat:
         """
         assert verifier_cls is not None, "Verifier is not given"
         verifier = verifier_cls()
+        return verifier(val)
+
+    @staticmethod
+    def json_parse(val: str):
+        """
+        Robust JSON extraction from LLM responses.
+        Handles responses that may contain markdown code blocks or extra text around JSON.
+        """
+        # Strip markdown code blocks if present
+        stripped = val.strip()
+        if stripped.startswith("```json"):
+            stripped = stripped[7:]
+        elif stripped.startswith("```"):
+            stripped = stripped[3:]
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
+        stripped = stripped.strip()
+
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            pass
+
+        verifier = FormatVerifierJson()
         return verifier(val)

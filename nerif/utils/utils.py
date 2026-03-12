@@ -37,6 +37,12 @@ VLLM_API_KEY = os.environ.get("VLLM_API_KEY")
 SLLM_URL = os.environ.get("SLLM_URL")
 SLLM_API_KEY = os.environ.get("SLLM_API_KEY")
 
+# Anthropic configuration
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+
+# Google configuration
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+
 
 def similarity_dist(vec1, vec2, func="cosine"):
     if type(vec1) is list:
@@ -85,6 +91,47 @@ class MessageType(Enum):
     IMAGE_URL = auto()
     IMAGE_BASE64 = auto()
     TEXT = auto()
+    AUDIO_PATH = auto()
+    AUDIO_URL = auto()
+    AUDIO_BASE64 = auto()
+    VIDEO_PATH = auto()
+    VIDEO_URL = auto()
+
+
+def _build_model_kwargs(
+    model: str,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> dict:
+    """Build kwargs dict for litellm based on model name prefix."""
+    kwargs = {"model": model}
+
+    if model.startswith("custom_openai/"):
+        kwargs["api_key"] = api_key if (api_key and api_key != "") else OPENAI_API_KEY
+        kwargs["base_url"] = base_url if (base_url and base_url != "") else OPENAI_API_BASE
+    elif model in OPENAI_MODEL or model in OPENAI_EMBEDDING_MODEL:
+        kwargs["api_key"] = api_key if (api_key and api_key != "") else OPENAI_API_KEY
+        kwargs["base_url"] = base_url if (base_url and base_url != "") else OPENAI_API_BASE
+    elif model.startswith("anthropic/"):
+        kwargs["api_key"] = api_key if (api_key and api_key != "") else ANTHROPIC_API_KEY
+    elif model.startswith("gemini/"):
+        kwargs["api_key"] = api_key if (api_key and api_key != "") else GOOGLE_API_KEY
+    elif model.startswith("openrouter"):
+        pass  # litellm handles openrouter natively
+    elif model.startswith("ollama"):
+        pass  # litellm handles ollama/ prefix natively
+    elif model.startswith("vllm"):
+        pass  # litellm handles vllm/ prefix natively
+    elif model.startswith("sllm"):
+        pass  # litellm handles sllm/ prefix natively
+    else:
+        # default: pass through api_key/base_url if provided
+        if api_key and api_key != "":
+            kwargs["api_key"] = api_key
+        if base_url and base_url != "":
+            kwargs["base_url"] = base_url
+
+    return kwargs
 
 
 def get_litellm_embedding(
@@ -94,27 +141,12 @@ def get_litellm_embedding(
     base_url: Optional[str] = None,
     counter: Optional[NerifTokenCounter] = None,
 ) -> Any:
-    if model in OPENAI_EMBEDDING_MODEL:
-        if api_key is None or api_key == "":
-            api_key = OPENAI_API_KEY
-        if base_url is None or base_url == "":
-            base_url = OPENAI_API_BASE
-        kargs = {
-            "model": model,
-            "input": messages,
-            "api_key": api_key,
-            "base_url": base_url,
-        }
-    elif model.startswith("openrouter"):
-        kargs = {
-            "model": model,
-            "input": messages,
-        }
-    elif model.startswith("ollama"):
-        kargs = {
-            "model": model,
-            "input": messages,
-        }
+    kargs = _build_model_kwargs(model, api_key, base_url)
+    kargs["input"] = messages
+
+    # For embedding, override base_url if explicitly provided
+    if base_url and base_url != "":
+        kargs["base_url"] = base_url
 
     response = litellm.embedding(**kargs)
 
@@ -125,6 +157,95 @@ def get_litellm_embedding(
     return response
 
 
+def get_model_response(
+    messages: List[Any],
+    model: str = NERIF_DEFAULT_LLM_MODEL,
+    temperature: float = 0,
+    max_tokens: int | None = None,
+    stream: bool = False,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    logprobs: bool = False,
+    top_logprobs: int = 5,
+    counter: Optional[NerifTokenCounter] = None,
+    tools: Optional[List[Any]] = None,
+    tool_choice: Optional[Any] = None,
+    response_format: Optional[Any] = None,
+) -> Any:
+    """
+    Unified model response function. Routes to the correct backend based on model name prefix.
+    Supports all backends that litellm supports (OpenAI, Anthropic, Gemini, Ollama, vLLM, etc.).
+
+    Parameters:
+    - messages (list): The list of messages to send to the model.
+    - model (str): The model name (with optional prefix like 'anthropic/', 'gemini/', 'ollama/').
+    - temperature (float): The temperature setting for response generation.
+    - max_tokens (int): The maximum number of tokens to generate.
+    - stream (bool): Whether to stream the response.
+    - api_key (str): Override API key.
+    - base_url (str): Override base URL.
+    - logprobs (bool): Whether to return log probabilities.
+    - top_logprobs (int): Number of top log probabilities to return.
+    - counter: Token counter instance.
+    - tools (list): Tool definitions for function calling.
+    - tool_choice: Tool choice parameter for function calling.
+    - response_format: Response format (e.g. {"type": "json_object"}).
+
+    Returns:
+    - The model response object.
+    """
+    kargs = _build_model_kwargs(model, api_key, base_url)
+    kargs["messages"] = messages
+    kargs["stream"] = stream
+    kargs["temperature"] = temperature
+    kargs["max_tokens"] = max_tokens
+
+    if logprobs:
+        kargs["logprobs"] = logprobs
+        kargs["top_logprobs"] = top_logprobs
+
+    if tools is not None:
+        kargs["tools"] = tools
+    if tool_choice is not None:
+        kargs["tool_choice"] = tool_choice
+    if response_format is not None:
+        kargs["response_format"] = response_format
+
+    # For custom_openai/ prefix, bypass litellm and use OpenAI client directly.
+    # This is useful for proxies that only support /v1/chat/completions
+    # (e.g. when litellm routes GPT-5 models to /v1/responses).
+    if model.startswith("custom_openai/"):
+        actual_model = model[len("custom_openai/"):]
+        client_api_key = kargs.get("api_key") or OPENAI_API_KEY
+        client_base_url = kargs.get("base_url") or OPENAI_API_BASE
+        client = OpenAI(api_key=client_api_key, base_url=client_base_url)
+        oai_kwargs = {
+            "model": actual_model,
+            "messages": messages,
+            "stream": stream,
+        }
+        if temperature is not None:
+            oai_kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            oai_kwargs["max_tokens"] = max_tokens
+        if tools is not None:
+            oai_kwargs["tools"] = tools
+        if tool_choice is not None:
+            oai_kwargs["tool_choice"] = tool_choice
+        if response_format is not None:
+            oai_kwargs["response_format"] = response_format
+        responses = client.chat.completions.create(**oai_kwargs)
+    else:
+        responses = litellm.completion(**kargs)
+
+    if counter is not None:
+        counter.set_parser_based_on_model(model)
+        counter.count_from_response(responses)
+
+    return responses
+
+
+# Backward-compatible alias
 def get_litellm_response(
     messages: List[Any],
     model: str = NERIF_DEFAULT_LLM_MODEL,
@@ -137,77 +258,19 @@ def get_litellm_response(
     top_logprobs: int = 5,
     counter: Optional[NerifTokenCounter] = None,
 ) -> Any:
-    """
-    Get a text response from an litellm model.
-
-    Parameters:
-    - messages (list): The list of messages to send to the model.
-    - model (str): Te name of the OpenAI model to use. Default is "gpt-3.5-turbo".
-    - temperature (float): The temperature setting for response generation. Default is 0.
-    - max_tokens (int): The maximum number of tokens to generate in the response. Default is 300.
-    - stream (bool): Whether to stream the response. Default is False.
-    - api_key (str): The API key for accessing the OpenAI API. Default is None.
-    - batch_size (int): The number of predictions to make in a single request. Default is 1.
-
-    Returns:
-    - list: A list of generated text responses if messages is a list, otherwise a single text response.
-    """
-
-    if model in OPENAI_MODEL:
-        if api_key is None or api_key == "":
-            api_key = OPENAI_API_KEY
-        if base_url is None or base_url == "":
-            base_url = OPENAI_API_BASE
-        kargs = {
-            "model": model,
-            "messages": messages,
-            "api_key": api_key,
-            "base_url": base_url,
-        }
-    elif model.startswith("openrouter"):
-        kargs = {
-            "model": model,
-            "messages": messages,
-        }
-    elif model.startswith("ollama"):
-        kargs = {
-            "model": model,
-            "messages": messages,
-        }
-    elif model.startswith("vllm"):
-        kargs = {
-            "model": model,
-            "messages": messages,
-        }
-    elif model.startswith("sllm"):
-        kargs = {
-            "model": model,
-            "messages": messages,
-        }
-    else:
-        # default method: use openai style
-        kargs = {
-            "model": model,
-            "messages": messages,
-            "api_key": api_key,
-            "base_url": base_url,
-        }
-
-    kargs["stream"] = stream
-    kargs["temperature"] = temperature
-    kargs["max_tokens"] = max_tokens
-
-    if logprobs:
-        kargs["logprobs"] = logprobs
-        kargs["top_logprobs"] = top_logprobs
-
-    responses = litellm.completion(**kargs)
-
-    if counter is not None:
-        counter.set_parser_based_on_model(model)
-        counter.count_from_response(responses)
-
-    return responses
+    """Backward-compatible wrapper around get_model_response()."""
+    return get_model_response(
+        messages=messages,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        stream=stream,
+        api_key=api_key,
+        base_url=base_url,
+        logprobs=logprobs,
+        top_logprobs=top_logprobs,
+        counter=counter,
+    )
 
 
 def get_ollama_response(
@@ -220,43 +283,20 @@ def get_ollama_response(
     api_key: Optional[str] = None,
     counter: Optional[NerifTokenCounter] = None,
 ) -> Union[str, List[str]]:
-    """
-    Get a text response from an Ollama model.
-
-    Parameters:
-    - messages (str or list): The input messages for the model.
-    - url (str): The URL of the Ollama API. Default is "http://localhost:11434/api/generate".
-    - model (str): The name of the Ollama model. Default is "llama3.1".
-    - max_tokens (int): The maximum number of tokens to generate in the response. Default is 300.
-    - temperature (float): The temperature setting for response generation. Default is 0.
-    - stream (bool): Whether to stream the response. Default is False.
-    - api_key (str): The API key for accessing the Ollama API. Default is None.
-    - batch_size (int): The number of predictions to make in a single request. Default is 1.
-
-    Returns:
-    - str or list: The generated text response(s).
-    """
-
-    # todo: support batch ollama inference
+    """Backward-compatible Ollama wrapper."""
     if url is None or url == "":
-        # default ollama url
         url = "http://localhost:11434/v1/"
 
-    response = get_litellm_response(
-        messages,
+    return get_model_response(
+        messages=messages,
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
         stream=stream,
         api_key=api_key,
         base_url=url,
+        counter=counter,
     )
-
-    if counter is not None:
-        counter.set_parser_based_on_model(model)
-        counter.count_from_response(response)
-
-    return response
 
 
 def get_vllm_response(
@@ -269,29 +309,10 @@ def get_vllm_response(
     api_key: Optional[str] = None,
     counter: Optional[NerifTokenCounter] = None,
 ) -> Union[str, List[str]]:
-    """
-    Get a text response from a vLLM model.
-
-    Parameters:
-    - messages (str or list): The input messages for the model.
-    - url (str): The URL of the vLLM API. Default is "http://localhost:8000/v1".
-    - model (str): The name of the vLLM model. Default is "llama3.1".
-    - max_tokens (int): The maximum number of tokens to generate in the response. Default is 300.
-    - temperature (float): The temperature setting for response generation. Default is 0.
-    - stream (bool): Whether to stream the response. Default is False.
-    - api_key (str): The API key for accessing the vLLM API. Default is None.
-    - batch_size (int): The number of predictions to make in a single request. Default is 1.
-
-    Returns:
-    - str or list: The generated text response(s).
-    """
-
-    # todo: support batch ollama inference
+    """Backward-compatible vLLM wrapper. Uses OpenAI client directly for vLLM."""
     if url is None or url == "":
-        # default vllm url
         url = "http://localhost:8000/v1"
     if api_key is None or api_key == "":
-        # default vllm api key from vllm document example
         api_key = "token-abc123"
 
     model = "/".join(model.split("/")[1:])
@@ -326,29 +347,10 @@ def get_sllm_response(
     api_key: Optional[str] = None,
     counter: Optional[NerifTokenCounter] = None,
 ) -> Union[str, List[str]]:
-    """
-    Get a text response from an Ollama model.
-
-    Parameters:
-    - messages (str or list): The input messages for the model.
-    - url (str): The URL of the SLLM API. Default is "http://localhost:8000/v1".
-    - model (str): The name of the SLLM model. Default is "llama3.1".
-    - max_tokens (int): The maximum number of tokens to generate in the response. Default is 300.
-    - temperature (float): The temperature setting for response generation. Default is 0.
-    - stream (bool): Whether to stream the response. Default is False.
-    - api_key (str): The API key for accessing the SLLM API. Default is None.
-    - batch_size (int): The number of predictions to make in a single request. Default is 1.
-
-    Returns:
-    - str or list: The generated text response(s).
-    """
-
-    # todo: support batch ollama inference
+    """Backward-compatible SLLM wrapper. Uses OpenAI client directly for SLLM."""
     if url is None or url == "":
-        # default vllm url
         url = "http://localhost:8343/v1"
     if api_key is None or api_key == "":
-        # default vllm api key from vllm document example
         api_key = "token-abc123"
 
     model = "/".join(model.split("/")[1:])

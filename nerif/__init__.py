@@ -1,3 +1,3 @@
-from . import batch, core, model, utils
+from . import agent, batch, core, model, utils
 
-__all__ = ["batch", "core", "model", "utils"]
+__all__ = ["agent", "batch", "core", "model", "utils"]
