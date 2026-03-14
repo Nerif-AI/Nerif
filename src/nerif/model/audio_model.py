@@ -27,6 +27,19 @@ class AudioModel:
             resp.raise_for_status()
         return resp.json()
 
+    async def atranscribe(self, file: Path):
+        """Async version of transcribe."""
+        url = f"{self.base_url}/audio/transcriptions"
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        with open(file, "rb") as audio_file:
+            file_content = audio_file.read()
+        files = {"file": (str(file), file_content)}
+        data = {"model": "whisper-1"}
+        async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT) as client:
+            resp = await client.post(url, headers=headers, files=files, data=data)
+            resp.raise_for_status()
+        return resp.json()
+
 
 class SpeechModel:
     """
@@ -50,4 +63,21 @@ class SpeechModel:
         }
         resp = httpx.post(url, json=body, headers=headers, timeout=_DEFAULT_TIMEOUT)
         resp.raise_for_status()
+        return resp.content
+
+    async def atext_to_speech(self, text: str, voice: str = "alloy"):
+        """Async version of text_to_speech."""
+        url = f"{self.base_url}/audio/speech"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        body = {
+            "model": "tts-1",
+            "input": text,
+            "voice": voice,
+        }
+        async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT) as client:
+            resp = await client.post(url, json=body, headers=headers)
+            resp.raise_for_status()
         return resp.content

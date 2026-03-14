@@ -1,4 +1,3 @@
-from .audio_model import AudioModel, SpeechModel
 from .model import (
     LogitsChatModel,
     MultiModalMessage,
@@ -10,7 +9,11 @@ from .model import (
     VideoModel,
     VisionModel,
 )
-from .vision_model_enhanced import VisionModelWithCompression
+
+try:
+    from .vision_model_enhanced import VisionModelWithCompression
+except ImportError:
+    VisionModelWithCompression = None
 
 __all__ = [
     "LogitsChatModel",
@@ -19,8 +22,6 @@ __all__ = [
     "OllamaEmbeddingModel",
     "VisionModel",
     "VisionModelWithCompression",
-    "AudioModel",
-    "SpeechModel",
     "VideoModel",
     "MultiModalMessage",
     "ToolDefinition",
