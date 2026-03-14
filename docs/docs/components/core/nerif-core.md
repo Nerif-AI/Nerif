@@ -111,7 +111,7 @@ The Nerif class evaluates the truthfulness of statements using both logits and e
 
 **Attributes:**
 - `model: str` - LLM model name (default: NERIF_DEFAULT_LLM_MODEL)
-- `embed_model: str` - Embedding model name (default: NERIF_DEFAULT_EMBEDDING_MODE)
+- `embed_model: Optional[str]` - Embedding model name. Set to `None` to disable embedding and use text fallback.
 - `temperature: float` - Model temperature, defaults to 0
 - `counter: Optional[NerifTokenCounter]` - Token usage counter
 - `debug: bool` - Debug mode flag
@@ -168,6 +168,26 @@ print(f"Best match: {choices[idx]}")  # iPhone 12
 matcher = NerifMatchString(choices=["sunny", "rainy", "cloudy"])
 idx = matcher.match("The weather is warm and bright")
 print(f"Weather: {choices[idx]}")
+```
+
+### Optional Embedding
+
+As of v1.1, embedding is optional. When `embed_model=None` or `NERIF_DEFAULT_EMBEDDING_MODEL=""`:
+
+- Logits mode works as before (primary mode)
+- If logits fails, **text fallback** is used instead of embedding mode
+- Text fallback uses the LLM with string matching (less precise but requires no embedding API)
+
+```python
+from nerif.core import nerif, Nerif
+
+# Disable embedding explicitly
+judge = Nerif(model="gpt-4o", embed_model=None)
+result = judge.judge("the sky is blue")  # Works without embedding
+
+# Or via environment variable
+# export NERIF_DEFAULT_EMBEDDING_MODEL=""
+result = nerif("Python is awesome")  # Text fallback used
 ```
 
 ### Instant Mode

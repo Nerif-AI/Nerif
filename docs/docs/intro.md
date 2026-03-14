@@ -48,6 +48,11 @@ To tackle these challenges, we introduce **Nerif**. This tool seamlessly integra
 - **Agent framework** — `NerifAgent` runs ReAct-style tool-calling loops automatically
 - **Token tracking** — Monitor token usage with `NerifTokenCounter`
 - **Batch processing** — Process large volumes of requests with the OpenAI-compatible Batch API
+- **Streaming responses** — `stream_chat()` yields tokens in real-time for interactive applications
+- **Async support** — `achat()`, `aembed()`, `astream_chat()` for concurrent async/await usage
+- **Retry with backoff** — Automatic retry with exponential backoff via `RetryConfig`
+- **Pydantic output** — `response_model=MyModel` returns validated Pydantic objects directly
+- **Optional embedding** — `nerif()` works without embedding model via text fallback
 
 ## Installation
 

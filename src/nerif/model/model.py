@@ -1,6 +1,6 @@
 import base64
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, AsyncGenerator, Dict, Generator, List, Optional, Union
 
 from ..utils import (
     LOGGER,
@@ -8,10 +8,15 @@ from ..utils import (
     OPENAI_MODEL,
     MessageType,
     NerifTokenCounter,
-    get_litellm_embedding,
-    get_litellm_response,
+    get_embedding,
+    get_embedding_async,
     get_model_response,
+    get_model_response_async,
+    get_model_response_stream,
+    get_model_response_stream_async,
+    get_response,
 )
+from ..utils.retry import RetryConfig
 
 
 @dataclass
@@ -119,6 +124,7 @@ class SimpleChatModel:
         temperature: float = 0.0,
         counter: NerifTokenCounter = None,
         max_tokens: None | int = None,
+        retry_config: Optional[RetryConfig] = None,
     ):
         self.model = model
         self.temperature = temperature
@@ -128,6 +134,7 @@ class SimpleChatModel:
         ]
         self.counter = counter
         self.agent_max_tokens = max_tokens
+        self.retry_config = retry_config
 
     def reset(self, prompt: Optional[str] = None) -> None:
         if prompt is None:
@@ -145,6 +152,7 @@ class SimpleChatModel:
         tools: Optional[List[Union[Dict[str, Any], ToolDefinition]]] = None,
         tool_choice: Optional[Any] = None,
         response_format: Optional[Any] = None,
+        response_model: Optional[Any] = None,
     ) -> Union[str, List[ToolCallResult]]:
         """
         Send a message and get a response.
@@ -156,9 +164,11 @@ class SimpleChatModel:
             tools: List of tool definitions for function calling.
             tool_choice: Tool choice parameter (e.g. "auto", "none", or specific tool).
             response_format: Response format (e.g. {"type": "json_object"}).
+            response_model: Pydantic model class for structured output parsing.
 
         Returns:
-            Text response string, or list of ToolCallResult if tools were called.
+            Text response string, Pydantic model instance if response_model is set,
+            or list of ToolCallResult if tools were called.
         """
         if isinstance(message, MultiModalMessage):
             new_message = {"role": "user", "content": message.to_content()}
@@ -178,6 +188,17 @@ class SimpleChatModel:
                 else:
                     tool_dicts.append(t)
 
+        # When response_model is set, generate JSON schema and set response_format
+        if response_model is not None:
+            schema = response_model.model_json_schema()
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": response_model.__name__,
+                    "schema": schema,
+                },
+            }
+
         kwargs = {
             "model": self.model,
             "temperature": self.temperature,
@@ -192,6 +213,8 @@ class SimpleChatModel:
             kwargs["tool_choice"] = tool_choice
         if response_format is not None:
             kwargs["response_format"] = response_format
+        if self.retry_config is not None:
+            kwargs["retry_config"] = self.retry_config
 
         LOGGER.debug("requested with message: %s", self.messages)
         LOGGER.debug("arguments of request: %s", kwargs)
@@ -221,7 +244,181 @@ class SimpleChatModel:
             self.messages.append({"role": "assistant", "content": text_result})
         else:
             self.reset()
+
+        if response_model is not None:
+            from ..utils.format import FormatVerifierPydantic
+
+            verifier = FormatVerifierPydantic(response_model)
+            return verifier(text_result)
+
         return text_result
+
+    def stream_chat(
+        self,
+        message: Union[str, MultiModalMessage],
+        append: bool = False,
+        max_tokens: Optional[int] = None,
+        response_format: Optional[Any] = None,
+    ) -> Generator[str, None, None]:
+        """Stream response chunks. Yields text strings.
+
+        Note: Tool calling is not supported in streaming mode.
+        """
+        if isinstance(message, MultiModalMessage):
+            new_message = {"role": "user", "content": message.to_content()}
+        else:
+            new_message = {"role": "user", "content": message}
+        self.messages.append(new_message)
+
+        req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
+
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_tokens": req_max_tokens,
+        }
+        if response_format is not None:
+            kwargs["response_format"] = response_format
+
+        full_response = []
+        for chunk in get_model_response_stream(self.messages, **kwargs):
+            if chunk.content:
+                full_response.append(chunk.content)
+                yield chunk.content
+
+        # Manage history
+        complete_text = "".join(full_response)
+        if append:
+            self.messages.append({"role": "assistant", "content": complete_text})
+        else:
+            self.reset()
+
+    async def achat(
+        self,
+        message: Union[str, "MultiModalMessage"],
+        append: bool = False,
+        max_tokens: None | int = None,
+        tools: Optional[List[Union[Dict[str, Any], "ToolDefinition"]]] = None,
+        tool_choice: Optional[Any] = None,
+        response_format: Optional[Any] = None,
+        response_model: Optional[Any] = None,
+    ) -> Union[str, List["ToolCallResult"]]:
+        """Async version of chat()."""
+        if isinstance(message, MultiModalMessage):
+            new_message = {"role": "user", "content": message.to_content()}
+        else:
+            new_message = {"role": "user", "content": message}
+        self.messages.append(new_message)
+
+        req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
+
+        tool_dicts = None
+        if tools is not None:
+            tool_dicts = []
+            for t in tools:
+                if isinstance(t, ToolDefinition):
+                    tool_dicts.append(t.to_dict())
+                else:
+                    tool_dicts.append(t)
+
+        if response_model is not None:
+            schema = response_model.model_json_schema()
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": response_model.__name__,
+                    "schema": schema,
+                },
+            }
+
+        kwargs = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_tokens": req_max_tokens,
+        }
+
+        if self.counter is not None:
+            kwargs["counter"] = self.counter
+        if tool_dicts is not None:
+            kwargs["tools"] = tool_dicts
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
+        if response_format is not None:
+            kwargs["response_format"] = response_format
+        if self.retry_config is not None:
+            kwargs["retry_config"] = self.retry_config
+
+        LOGGER.debug("requested with message: %s", self.messages)
+        LOGGER.debug("arguments of request: %s", kwargs)
+
+        result = await get_model_response_async(self.messages, **kwargs)
+
+        choice = result.choices[0]
+
+        if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
+            tool_results = [
+                ToolCallResult(
+                    id=tc.id,
+                    name=tc.function.name,
+                    arguments=tc.function.arguments,
+                )
+                for tc in choice.message.tool_calls
+            ]
+            if append:
+                self.messages.append({"role": "assistant", "content": None, "tool_calls": choice.message.tool_calls})
+            else:
+                self.reset()
+            return tool_results
+
+        text_result = choice.message.content
+        if append:
+            self.messages.append({"role": "assistant", "content": text_result})
+        else:
+            self.reset()
+
+        if response_model is not None:
+            from ..utils.format import FormatVerifierPydantic
+
+            verifier = FormatVerifierPydantic(response_model)
+            return verifier(text_result)
+
+        return text_result
+
+    async def astream_chat(
+        self,
+        message: Union[str, "MultiModalMessage"],
+        append: bool = False,
+        max_tokens: Optional[int] = None,
+        response_format: Optional[Any] = None,
+    ) -> AsyncGenerator[str, None]:
+        """Async streaming version of stream_chat(). Yields text strings."""
+        if isinstance(message, MultiModalMessage):
+            new_message = {"role": "user", "content": message.to_content()}
+        else:
+            new_message = {"role": "user", "content": message}
+        self.messages.append(new_message)
+
+        req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
+
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_tokens": req_max_tokens,
+        }
+        if response_format is not None:
+            kwargs["response_format"] = response_format
+
+        full_response = []
+        async for chunk in get_model_response_stream_async(self.messages, **kwargs):
+            if chunk.content:
+                full_response.append(chunk.content)
+                yield chunk.content
+
+        complete_text = "".join(full_response)
+        if append:
+            self.messages.append({"role": "assistant", "content": complete_text})
+        else:
+            self.reset()
 
 
 class SimpleEmbeddingModel:
@@ -242,12 +439,21 @@ class SimpleEmbeddingModel:
         self.counter = counter
 
     def embed(self, string: str) -> List[float]:
-        result = get_litellm_embedding(
+        result = get_embedding(
             messages=string,
             model=self.model,
             counter=self.counter,
         )
 
+        return result.data[0]["embedding"]
+
+    async def aembed(self, string: str) -> List[float]:
+        """Async version of embed()."""
+        result = await get_embedding_async(
+            messages=string,
+            model=self.model,
+            counter=self.counter,
+        )
         return result.data[0]["embedding"]
 
 
@@ -292,7 +498,7 @@ class LogitsChatModel:
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
         if self.model in OPENAI_MODEL:
-            result = get_litellm_response(
+            result = get_response(
                 self.messages,
                 model=self.model,
                 temperature=self.temperature,
@@ -323,7 +529,7 @@ class OllamaEmbeddingModel:
         self.counter = counter
 
     def embed(self, string: str) -> List[float]:
-        result = get_litellm_embedding(
+        result = get_embedding(
             messages=string,
             model=self.model,
             base_url=self.url,
@@ -402,7 +608,7 @@ class VisionModel:
 
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
-        result = get_litellm_response(
+        result = get_response(
             self.messages,
             model=self.model,
             temperature=self.temperature,
@@ -443,9 +649,7 @@ class VideoModel:
         msg = MultiModalMessage().add_video_url(video_url).add_text(prompt)
         return self._chat_model.chat(msg, max_tokens=max_tokens)
 
-    def analyze_path(
-        self, video_path: str, prompt: str = "Describe this video.", max_tokens: int | None = None
-    ) -> str:
+    def analyze_path(self, video_path: str, prompt: str = "Describe this video.", max_tokens: int | None = None) -> str:
         msg = MultiModalMessage().add_video_path(video_path).add_text(prompt)
         return self._chat_model.chat(msg, max_tokens=max_tokens)
 

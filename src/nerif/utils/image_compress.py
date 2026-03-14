@@ -1,6 +1,9 @@
 """
 Image compression utility for Nerif.
 Automatically compresses images larger than 1MB using lossless and lossy techniques.
+
+Uses the Rust-based `nerif_native` backend when available for faster processing,
+falling back to PIL/Pillow otherwise.
 """
 
 import io
@@ -12,6 +15,17 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
+# Try to import the Rust native backend
+try:
+    import nerif_native as _native
+
+    _HAS_NATIVE = True
+    logger.debug("nerif_native Rust backend loaded")
+except ImportError:
+    _native = None
+    _HAS_NATIVE = False
+    logger.debug("nerif_native not available, using PIL fallback")
+
 
 class ImageCompressor:
     """
@@ -21,7 +35,9 @@ class ImageCompressor:
     - Lossless optimization for PNG images
     - Smart JPEG quality adjustment
     - Format conversion when beneficial
+    - Transparency detection
     - Batch processing support
+    - Uses Rust backend (nerif_native) when available for faster processing
     """
 
     def __init__(
@@ -72,7 +88,59 @@ class ImageCompressor:
         if original_size <= self.size_threshold_bytes:
             return False, 1.0, f"Image size ({self._format_size(original_size)}) is below threshold"
 
-        # Open and analyze image
+        if output_path is None:
+            output_path = image_path
+        else:
+            output_path = Path(output_path)
+
+        # Try Rust backend first
+        if _HAS_NATIVE:
+            try:
+                return self._compress_native(image_path, output_path, original_size)
+            except Exception as e:
+                logger.warning(f"Native compression failed, falling back to PIL: {e}")
+
+        # PIL fallback
+        return self._compress_pil(image_path, output_path, original_size, preserve_metadata)
+
+    def _compress_native(
+        self,
+        image_path: Path,
+        output_path: Path,
+        original_size: int,
+    ) -> Tuple[bool, float, str]:
+        """Compress using the Rust nerif_native backend."""
+        raw = image_path.read_bytes()
+
+        # Detect if image has transparency to choose format
+        has_alpha = _native.has_transparency(raw)
+        fmt = "png" if has_alpha else "jpeg"
+
+        compressed = _native.compress_image(
+            raw,
+            quality=self.jpeg_quality,
+            force_format=fmt,
+        )
+
+        output_path.write_bytes(compressed)
+        new_size = len(compressed)
+        ratio = original_size / new_size if new_size > 0 else 1.0
+
+        message = (
+            f"Compressed from {self._format_size(original_size)} "
+            f"to {self._format_size(new_size)} "
+            f"(ratio: {ratio:.2f}x, backend: native)"
+        )
+        return True, ratio, message
+
+    def _compress_pil(
+        self,
+        image_path: Path,
+        output_path: Path,
+        original_size: int,
+        preserve_metadata: bool,
+    ) -> Tuple[bool, float, str]:
+        """Compress using PIL/Pillow."""
         try:
             with Image.open(image_path) as img:
                 format_name = img.format
@@ -89,17 +157,9 @@ class ImageCompressor:
                 # Determine compression strategy
                 compressed_img, compressed_format = self._compress_strategy(img, format_name, mode)
 
-                # Save compressed image
-                if output_path is None:
-                    output_path = image_path
-                else:
-                    output_path = Path(output_path)
-
                 save_kwargs = self._get_save_kwargs(compressed_format, exif_data)
-
                 compressed_img.save(output_path, **save_kwargs)
 
-                # Calculate compression ratio
                 new_size = output_path.stat().st_size
                 compression_ratio = original_size / new_size
 
@@ -108,7 +168,6 @@ class ImageCompressor:
                     f"to {self._format_size(new_size)} "
                     f"(ratio: {compression_ratio:.2f}x)"
                 )
-
                 return True, compression_ratio, message
 
         except Exception as e:
@@ -116,109 +175,55 @@ class ImageCompressor:
             raise
 
     def _compress_strategy(self, img: Image.Image, format_name: str, mode: str) -> Tuple[Image.Image, str]:
-        """
-        Determine the best compression strategy for the image.
-
-        Args:
-            img: PIL Image object
-            format_name: Original format (PNG, JPEG, etc.)
-            mode: Image mode (RGB, RGBA, etc.)
-
-        Returns:
-            Tuple of (compressed_image, target_format)
-        """
+        """Determine the best compression strategy for the image."""
         # For PNG images
         if format_name == "PNG":
-            # Try lossless PNG optimization first
             png_buffer = io.BytesIO()
             img.save(png_buffer, format="PNG", optimize=True, compress_level=self.png_compress_level)
             png_size = png_buffer.tell()
 
-            # If image has no transparency, try JPEG conversion
             if mode in ["RGB", "L"] or (mode == "RGBA" and not self._has_transparency(img)):
                 jpeg_buffer = io.BytesIO()
-
-                # Convert RGBA to RGB if needed
                 if mode == "RGBA":
                     rgb_img = Image.new("RGB", img.size, (255, 255, 255))
                     rgb_img.paste(img, mask=img.split()[3])
                     img = rgb_img
-
                 img.save(jpeg_buffer, format="JPEG", quality=self.jpeg_quality, optimize=True)
                 jpeg_size = jpeg_buffer.tell()
-
-                # If JPEG is significantly smaller, use it
                 if jpeg_size < png_size * self.convert_to_jpeg_threshold:
                     return img, "JPEG"
-
             return img, "PNG"
-
-        # For JPEG images
         elif format_name in ["JPEG", "JPG"]:
-            # Progressive JPEG with optimization
             return img, "JPEG"
-
-        # For other formats, convert to appropriate format
         else:
             if mode == "RGBA" or self._has_transparency(img):
                 return img, "PNG"
             else:
-                # Convert to RGB if needed
                 if mode not in ["RGB", "L"]:
                     img = img.convert("RGB")
                 return img, "JPEG"
 
     def _get_save_kwargs(self, format_name: str, exif_data: Optional[bytes]) -> dict:
-        """
-        Get save keyword arguments for the specified format.
-
-        Args:
-            format_name: Target format
-            exif_data: EXIF data to preserve
-
-        Returns:
-            Dictionary of save parameters
-        """
+        """Get save keyword arguments for the specified format."""
         kwargs = {"format": format_name, "optimize": True}
-
         if format_name == "PNG":
             kwargs["compress_level"] = self.png_compress_level
         elif format_name == "JPEG":
             kwargs["quality"] = self.jpeg_quality
             kwargs["progressive"] = True
-
         if exif_data:
             kwargs["exif"] = exif_data
-
         return kwargs
 
     def _has_transparency(self, img: Image.Image) -> bool:
-        """
-        Check if an image has actual transparency.
-
-        Args:
-            img: PIL Image object
-
-        Returns:
-            True if image has transparent pixels
-        """
+        """Check if an image has actual transparency."""
         if img.mode != "RGBA":
             return False
-
-        # Check alpha channel
         alpha = img.split()[-1]
         return alpha.getextrema()[0] < 255
 
     def _format_size(self, size_bytes: int) -> str:
-        """
-        Format file size in human-readable format.
-
-        Args:
-            size_bytes: Size in bytes
-
-        Returns:
-            Formatted size string
-        """
+        """Format file size in human-readable format."""
         for unit in ["B", "KB", "MB", "GB"]:
             if size_bytes < 1024.0:
                 return f"{size_bytes:.2f} {unit}"
@@ -231,37 +236,21 @@ class ImageCompressor:
         output_dir: Optional[Union[str, Path]] = None,
         preserve_structure: bool = True,
     ) -> List[Tuple[str, bool, float, str]]:
-        """
-        Compress multiple images in batch.
-
-        Args:
-            image_paths: List of image paths
-            output_dir: Output directory (if None, overwrites originals)
-            preserve_structure: Preserve directory structure in output
-
-        Returns:
-            List of tuples (path, was_compressed, ratio, message)
-        """
+        """Compress multiple images in batch."""
         results = []
-
         for image_path in image_paths:
             image_path = Path(image_path)
-
             try:
                 if output_dir:
                     output_dir = Path(output_dir)
                     output_dir.mkdir(parents=True, exist_ok=True)
-
                     if preserve_structure:
-                        # Preserve relative path structure
                         try:
-                            # Try to get relative path from common parent
                             common_parent = (
                                 Path(*image_path.parts[:-2]) if len(image_path.parts) > 2 else image_path.parent
                             )
                             rel_path = image_path.relative_to(common_parent)
                         except ValueError:
-                            # Fallback to just the filename if paths don't share common parent
                             rel_path = image_path.name
                         output_path = output_dir / rel_path
                         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -272,27 +261,16 @@ class ImageCompressor:
 
                 was_compressed, ratio, message = self.compress_image(image_path, output_path)
                 results.append((str(image_path), was_compressed, ratio, message))
-
             except Exception as e:
                 results.append((str(image_path), False, 1.0, f"Error: {e}"))
                 logger.error(f"Failed to compress {image_path}: {e}")
-
         return results
 
     def get_compression_stats(self, results: List[Tuple[str, bool, float, str]]) -> dict:
-        """
-        Generate statistics from batch compression results.
-
-        Args:
-            results: List of compression results
-
-        Returns:
-            Dictionary with compression statistics
-        """
+        """Generate statistics from batch compression results."""
         total_files = len(results)
         compressed_files = sum(1 for _, was_compressed, _, _ in results if was_compressed)
         failed_files = sum(1 for _, _, ratio, msg in results if "Error" in msg)
-
         compression_ratios = [ratio for _, was_compressed, ratio, _ in results if was_compressed and ratio > 1]
 
         stats = {
@@ -305,8 +283,8 @@ class ImageCompressor:
             ),
             "max_compression_ratio": max(compression_ratios) if compression_ratios else 0,
             "min_compression_ratio": min(compression_ratios) if compression_ratios else 0,
+            "backend": "native" if _HAS_NATIVE else "pil",
         }
-
         return stats
 
 

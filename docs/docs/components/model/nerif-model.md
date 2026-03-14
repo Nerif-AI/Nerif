@@ -18,12 +18,16 @@ Attributes:
 - `counter (NerifTokenCounter)`: Token counter instance.
 - `messages (List[Any])`: The conversation history.
 - `max_tokens (int)`: The maximum number of tokens to generate in the response.
+- `retry_config (RetryConfig)`: Retry strategy for API calls.
 
 Methods:
 
 - `reset(prompt=None)`: Resets the conversation history. Optionally sets a new system prompt.
 - `set_max_tokens(max_tokens=None|int)`: Sets the maximum tokens limit.
 - `chat(message, append=False, max_tokens=None, tools=None, tool_choice=None, response_format=None)`: Sends a message and gets a response.
+- `stream_chat(message, append=False, max_tokens=None, response_format=None)`: Stream response tokens.
+- `achat(message, append=False, max_tokens=None, tools=None, tool_choice=None, response_format=None, response_model=None)`: Async version of chat().
+- `astream_chat(message, append=False, max_tokens=None, response_format=None)`: Async streaming.
 
 Init:
 
@@ -35,6 +39,7 @@ def __init__(
     temperature: float = 0.0,
     counter: NerifTokenCounter = None,
     max_tokens: None | int = None,
+    retry_config: RetryConfig = None,  # NEW
 )
 ```
 
@@ -49,7 +54,8 @@ def chat(
     tools: Optional[List[Union[Dict, ToolDefinition]]] = None,
     tool_choice: Optional[Any] = None,
     response_format: Optional[Any] = None,
-) -> Union[str, List[ToolCallResult]]:
+    response_model: Optional[Any] = None,  # NEW
+) -> Union[str, List[ToolCallResult], BaseModel]:
 ```
 
 **Parameters:**
@@ -183,6 +189,75 @@ parsed = NerifFormat.json_parse(result)
 
 ---
 
+### Streaming
+
+Use `stream_chat()` for real-time token-by-token output:
+
+```python
+from nerif.model import SimpleChatModel
+
+model = SimpleChatModel()
+
+for chunk in model.stream_chat("Write a haiku about coding."):
+    print(chunk, end="", flush=True)
+print()
+```
+
+### Async Support
+
+All model methods have async counterparts with `a` prefix:
+
+```python
+import asyncio
+from nerif.model import SimpleChatModel
+
+async def main():
+    model = SimpleChatModel()
+    result = await model.achat("Hello!")
+    print(result)
+
+    # Async streaming
+    async for chunk in model.astream_chat("Tell me a story."):
+        print(chunk, end="", flush=True)
+
+asyncio.run(main())
+```
+
+### Retry Configuration
+
+Configure automatic retry with exponential backoff:
+
+```python
+from nerif.model import SimpleChatModel
+from nerif.utils import RetryConfig, NO_RETRY, AGGRESSIVE_RETRY
+
+# Custom retry
+model = SimpleChatModel(retry_config=RetryConfig(max_retries=5, base_delay=0.5))
+
+# No retry
+model_fast = SimpleChatModel(retry_config=NO_RETRY)
+```
+
+### Pydantic Structured Output
+
+Use `response_model` for type-safe structured output:
+
+```python
+from pydantic import BaseModel
+from nerif.model import SimpleChatModel
+
+class City(BaseModel):
+    name: str
+    country: str
+    population: int
+
+model = SimpleChatModel()
+city = model.chat("Tell me about Tokyo.", response_model=City)
+print(f"{city.name}, {city.country}: {city.population:,}")
+```
+
+---
+
 ### SimpleEmbeddingModel
 
 A simple model class for embedding text. Converts text strings into numerical vector representations.
@@ -195,6 +270,7 @@ Attributes:
 Methods:
 
 - `embed(string: str) -> List[float]`: Encodes a string into an embedding vector.
+- `aembed(string: str) -> List[float]`: Async version of embed().
 
 Init:
 ```python

@@ -48,6 +48,11 @@ print(f"Best match: {choices[idx]}")
 - **Agent 框架** — `NerifAgent` 自动运行 ReAct 风格的工具调用循环
 - **Token 追踪** — 使用 `NerifTokenCounter` 监控 token 使用量
 - **批量处理** — 使用兼容 OpenAI 的 Batch API 处理大量请求
+- **流式响应** — `stream_chat()` 实时逐 token 输出，适用于交互式应用
+- **异步支持** — `achat()`、`aembed()`、`astream_chat()` 支持 async/await 并发调用
+- **自动重试** — 通过 `RetryConfig` 实现指数退避的自动重试机制
+- **Pydantic 输出** — `response_model=MyModel` 直接返回验证后的 Pydantic 对象
+- **Embedding 可选** — `nerif()` 无需 embedding 模型也能工作，使用文本回退匹配
 
 ## 安装
 

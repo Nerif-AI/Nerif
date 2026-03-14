@@ -20,6 +20,9 @@ Currently supported capabilities:
 - **Vision models** (`VisionModel`, `VideoModel`) - dedicated image and video analysis
 - **Audio models** (`AudioModel`) - speech-to-text transcription
 - **Embedding models** (`SimpleEmbeddingModel`, `OllamaEmbeddingModel`) - text embeddings
+- **Streaming** (`stream_chat()`, `astream_chat()`) - real-time token-by-token output
+- **Async API** (`achat()`, `aembed()`, `agenerate()`) - native async/await support
+- **Retry mechanism** (`RetryConfig`) - automatic retry with exponential backoff
 
 ### Nerif Agent
 
@@ -39,6 +42,10 @@ Nerif Core uses a **three-tier matching approach**:
 1. **Logits mode** - Uses the LLM's logprobs API for fast, direct token probability analysis
 2. **Structured output mode** - Falls back to JSON-formatted structured responses
 3. **Embedding mode** - Uses embedding similarity comparison as the final fallback
+
+:::note
+As of v1.1, embedding is optional. When no embedding model is configured, Nerif falls back to text-based matching, allowing `nerif()` and `nerif_match()` to work without requiring an embedding API key.
+:::
 
 Core functionality consists of these essential modules:
 

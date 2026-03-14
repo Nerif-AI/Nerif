@@ -32,8 +32,17 @@ export NERIF_DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
 
 ### Install
 
-```
+```bash
 pip install nerif
+```
+
+Optional feature groups:
+
+```bash
+pip install "nerif[img-gen]"
+pip install "nerif[asr]"
+pip install "nerif[tts]"
+pip install "nerif[pydantic]"
 ```
 
 ## QuickStart
@@ -52,6 +61,67 @@ else:
     # Call a simple model
     print("No", end=", ")
     print(model.chat("what is the color of the sky?"))
+```
+
+## v1.1 Features
+
+### Streaming
+
+```python
+from nerif.model import SimpleChatModel
+
+model = SimpleChatModel()
+for chunk in model.stream_chat("Tell me a story"):
+    print(chunk, end="", flush=True)
+```
+
+### Async Support
+
+```python
+import asyncio
+from nerif.model import SimpleChatModel
+
+async def main():
+    model = SimpleChatModel()
+    result = await model.achat("Hello!")
+    print(result)
+
+asyncio.run(main())
+```
+
+### Pydantic Structured Output
+
+```python
+from pydantic import BaseModel
+from nerif.model import SimpleChatModel
+
+class City(BaseModel):
+    name: str
+    country: str
+    population: int
+
+model = SimpleChatModel()
+city = model.chat("Tell me about Tokyo.", response_model=City)
+print(f"{city.name}: {city.population:,}")
+```
+
+### Retry Configuration
+
+```python
+from nerif.model import SimpleChatModel
+from nerif.utils import RetryConfig
+
+model = SimpleChatModel(retry_config=RetryConfig(max_retries=5))
+```
+
+### Optional Embedding
+
+```python
+from nerif.core import Nerif
+
+# Works without embedding model
+judge = Nerif(model="gpt-4o", embed_model=None)
+result = judge.judge("the sky is blue")
 ```
 
 ## Documentation

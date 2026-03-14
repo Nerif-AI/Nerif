@@ -119,6 +119,31 @@ data = NerifFormat.json_parse('The answer is {"result": 42} as expected.')
 # data = {"result": 42}
 ````
 
+### Pydantic Model Extraction
+
+`FormatVerifierPydantic` validates and parses LLM output into Pydantic model instances. Requires `pip install nerif[pydantic]`.
+
+```python title="Example: Pydantic model extraction"
+from pydantic import BaseModel
+from nerif.utils import NerifFormat, FormatVerifierPydantic
+
+class Person(BaseModel):
+    name: str
+    age: int
+
+# Direct usage
+verifier = FormatVerifierPydantic(Person)
+person = verifier('{"name": "Alice", "age": 30}')
+print(person.name)  # Alice
+
+# Static method on NerifFormat
+person = NerifFormat.pydantic_parse('{"name": "Bob", "age": 25}', Person)
+
+# Handles markdown code blocks and embedded JSON
+messy = 'Here is the data: ```json\n{"name": "Charlie", "age": 35}\n```'
+person = NerifFormat.pydantic_parse(messy, Person)
+```
+
 ## Implement Your Own Verifier
 
 All verifiers are derived from `FormatVerifierBase`. A valid verifier should implement three methods: `verify`, `match`, and `convert`, and set the `cls` to the target type. These methods will be called with the following logic:
@@ -169,6 +194,7 @@ Methods:
 
 - `try_convert(val=str, verifier_cls=FormatVerifierBase)`: Try convert string `val` by using the verifier. Raises an exception if conversion fails.
 - `json_parse(val=str)` *(static)*: Robust JSON extraction from LLM responses. Handles markdown code blocks, plain JSON strings, and embedded JSON within surrounding text.
+- `pydantic_parse(val=str, pydantic_model)` *(static)*: Extract and validate a Pydantic model from LLM response. Handles markdown code blocks and embedded JSON.
 
 ### `FormatVerifierBase`
 
@@ -188,3 +214,4 @@ Derived Classes:
 - `FormatVerifierHumanReadableList`: Convert a human readable numbered list to a Python `list[str]`.
 - `FormatVerifierStringList`: Extract `list[str]` from JSON arrays, markdown bullet lists, or numbered lists.
 - `FormatVerifierJson`: Extract JSON objects or arrays from string.
+- `FormatVerifierPydantic`: Extract and validate Pydantic model instances from string. Requires `pydantic>=2.0`.

@@ -1,6 +1,16 @@
 import json
 import re
 
+try:
+    from pydantic import BaseModel as PydanticBaseModel
+    from pydantic import ValidationError as PydanticValidationError
+
+    HAS_PYDANTIC = True
+except ImportError:
+    HAS_PYDANTIC = False
+    PydanticBaseModel = None
+    PydanticValidationError = None
+
 
 class FormatVerifierBase:
     cls = object
@@ -198,6 +208,47 @@ class FormatVerifierJson(FormatVerifierBase):
         return json.loads(val)
 
 
+class FormatVerifierPydantic(FormatVerifierBase):
+    """Validate and parse LLM output using a Pydantic model."""
+
+    simple = False
+
+    def __init__(self, pydantic_model):
+        if not HAS_PYDANTIC:
+            raise ImportError(
+                "pydantic is required for FormatVerifierPydantic. Install it with: pip install nerif[pydantic]"
+            )
+        self.pydantic_model = pydantic_model
+        self.cls = pydantic_model
+
+    def verify(self, val: str) -> bool:
+        try:
+            parsed = json.loads(val) if isinstance(val, str) else val
+            self.pydantic_model.model_validate(parsed)
+            return True
+        except (json.JSONDecodeError, Exception):
+            return False
+
+    def match(self, val: str):
+        """Multi-strategy extraction: direct parse -> markdown code block -> regex JSON."""
+        strategies = [
+            lambda v: json.loads(v),
+            lambda v: NerifFormat.json_parse(v),
+        ]
+        for strategy in strategies:
+            try:
+                parsed = strategy(val)
+                if parsed is not None:
+                    return self.pydantic_model.model_validate(parsed)
+            except Exception:
+                continue
+        return None
+
+    def convert(self, val):
+        parsed = json.loads(val) if isinstance(val, str) else val
+        return self.pydantic_model.model_validate(parsed)
+
+
 class NerifFormat:
     """
     Convert llm response to given type
@@ -236,4 +287,10 @@ class NerifFormat:
             pass
 
         verifier = FormatVerifierJson()
+        return verifier(val)
+
+    @staticmethod
+    def pydantic_parse(val: str, pydantic_model):
+        """Extract and validate a Pydantic model from LLM response."""
+        verifier = FormatVerifierPydantic(pydantic_model)
         return verifier(val)

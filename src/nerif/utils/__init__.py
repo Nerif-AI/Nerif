@@ -7,8 +7,8 @@ from .format import (
     FormatVerifierListInt,
     NerifFormat,
 )
-from .image_compress import ImageCompressor, compress_image_simple
 from .log import NerifFormatter, set_up_logging, timestamp_filename
+from .retry import AGGRESSIVE_RETRY, DEFAULT_RETRY, NO_RETRY, RetryConfig, retry_async, retry_sync
 from .token_counter import ModelCost, NerifTokenCounter, OllamaResponseParser, OpenAIResponseParser, ResponseParserBase
 from .utils import (
     ANTHROPIC_API_KEY,
@@ -26,17 +26,44 @@ from .utils import (
     SLLM_URL,
     VLLM_API_KEY,
     VLLM_URL,
+    ChatCompletionResponse,
+    EmbeddingResponse,
     MessageType,
+    StreamChunk,
+    get_embedding,
+    get_embedding_async,
     get_litellm_embedding,
     get_litellm_response,
     get_model_response,
+    get_model_response_async,
+    get_model_response_stream,
+    get_model_response_stream_async,
     get_ollama_response,
+    get_response,
     get_sllm_response,
     get_vllm_response,
     similarity_dist,
 )
 
+try:
+    from .image_compress import ImageCompressor, compress_image_simple
+except ImportError:
+    ImageCompressor = None
+    compress_image_simple = None
+
+try:
+    from .format import FormatVerifierPydantic
+except ImportError:
+    FormatVerifierPydantic = None
+
 __all__ = [
+    # retry
+    "RetryConfig",
+    "DEFAULT_RETRY",
+    "NO_RETRY",
+    "AGGRESSIVE_RETRY",
+    "retry_sync",
+    "retry_async",
     # format
     "FormatVerifierBase",
     "FormatVerifierFloat",
@@ -44,6 +71,7 @@ __all__ = [
     "FormatVerifierInt",
     "FormatVerifierJson",
     "FormatVerifierListInt",
+    "FormatVerifierPydantic",
     "MessageType",
     "NerifFormat",
     # image compression
@@ -59,14 +87,25 @@ __all__ = [
     "ResponseParserBase",
     "OpenAIResponseParser",
     "OllamaResponseParser",
-    # utils
+    # response types
+    "ChatCompletionResponse",
+    "EmbeddingResponse",
+    "StreamChunk",
+    # utils - new names
     "similarity_dist",
-    "get_litellm_embedding",
-    "get_litellm_response",
+    "get_embedding",
+    "get_embedding_async",
+    "get_response",
     "get_model_response",
+    "get_model_response_async",
+    "get_model_response_stream",
+    "get_model_response_stream_async",
     "get_ollama_response",
     "get_sllm_response",
     "get_vllm_response",
+    # utils - backward-compat aliases
+    "get_litellm_embedding",
+    "get_litellm_response",
     # environment variables
     "OPENAI_API_BASE",
     "OPENAI_API_KEY",

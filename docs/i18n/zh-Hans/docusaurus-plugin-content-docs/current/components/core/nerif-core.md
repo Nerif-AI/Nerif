@@ -110,7 +110,7 @@ Nerif 类使用 logits 模式和嵌入模式来评估语句的真实性。
 
 **属性：**
 - `model: str` - LLM 模型名称（默认值：NERIF_DEFAULT_LLM_MODEL）
-- `embed_model: str` - 嵌入模型名称（默认值：NERIF_DEFAULT_EMBEDDING_MODE）
+- `embed_model: Optional[str]` - Embedding 模型名称。设置为 `None` 可禁用 embedding，使用文本回退。
 - `temperature: float` - 模型温度参数，默认为 0
 - `counter: Optional[NerifTokenCounter]` - Token 用量计数器
 - `debug: bool` - 调试模式标志
@@ -167,6 +167,26 @@ print(f"Best match: {choices[idx]}")  # iPhone 12
 matcher = NerifMatchString(choices=["sunny", "rainy", "cloudy"])
 idx = matcher.match("The weather is warm and bright")
 print(f"Weather: {choices[idx]}")
+```
+
+### Embedding 可选化
+
+从 v1.1 开始，embedding 模型是可选的。当 `embed_model=None` 或 `NERIF_DEFAULT_EMBEDDING_MODEL=""` 时：
+
+- Logits 模式正常工作（首选模式）
+- 如果 logits 失败，使用**文本回退**替代 embedding 模式
+- 文本回退使用 LLM 配合字符串匹配（精度较低但无需 embedding API）
+
+```python
+from nerif.core import nerif, Nerif
+
+# 显式禁用 embedding
+judge = Nerif(model="gpt-4o", embed_model=None)
+result = judge.judge("天空是蓝色的")  # 无需 embedding 即可工作
+
+# 或通过环境变量设置
+# export NERIF_DEFAULT_EMBEDDING_MODEL=""
+result = nerif("Python 很棒")  # 使用文本回退
 ```
 
 ### 即时模式

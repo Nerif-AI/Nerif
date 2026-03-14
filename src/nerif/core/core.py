@@ -1,15 +1,27 @@
 from typing import Any, List, Optional
 
-import litellm
-
 from ..model import LogitsChatModel, SimpleChatModel, SimpleEmbeddingModel
-from ..utils import NERIF_DEFAULT_EMBEDDING_MODEL, NERIF_DEFAULT_LLM_MODEL, NerifTokenCounter, similarity_dist
+from ..utils import (
+    NERIF_DEFAULT_EMBEDDING_MODEL,
+    NERIF_DEFAULT_LLM_MODEL,
+    OPENAI_MODEL,
+    NerifTokenCounter,
+    similarity_dist,
+)
+
+# Models known to support the logprobs parameter
+_LOGPROBS_SUPPORTED_MODELS = set(OPENAI_MODEL)
 
 
 def support_logit_mode(model_name):
-    response = litellm.get_supported_openai_params(model=model_name)
-    if "logprob" in response:
+    # Check exact match
+    if model_name in _LOGPROBS_SUPPORTED_MODELS:
         return True
+    # Check if it's an OpenRouter-wrapped OpenAI model
+    if model_name.startswith("openrouter/openai/"):
+        bare = model_name[len("openrouter/openai/") :]
+        if bare in _LOGPROBS_SUPPORTED_MODELS:
+            return True
     return False
 
 
@@ -22,7 +34,7 @@ class NerificationBase:
     Attributes:
         original_options (List[Any]): Original list of possible values before conversion
         possible (List[str]): List of possible values converted to lowercase strings
-        embedding (SimpleEmbeddingAgent): Agent used for generating embeddings
+        embedding (SimpleEmbeddingAgent): Agent used for generating embeddings (lazy init)
         possible_embed (List): List of embeddings for each possible value
 
     Methods:
@@ -42,13 +54,13 @@ class NerificationBase:
     def __init__(
         self,
         possible_values: Optional[List[Any]] = None,
-        model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
+        model=NERIF_DEFAULT_EMBEDDING_MODEL,
         counter: Optional[NerifTokenCounter] = None,
     ):
         """
         Initialize the NerificationBase.
         possible_values: list[Any] = None
-        model: str = NERIF_DEFAULT_EMBEDDING_MODEL
+        model: str = NERIF_DEFAULT_EMBEDDING_MODEL (or None to disable embedding)
 
         possible_values: list of possible values to verify. Only store lower case string
         """
@@ -59,8 +71,24 @@ class NerificationBase:
         for index in range(len(possible_values)):
             self.possible.append(self.convert(possible_values[index]))
 
-        self.embedding = SimpleEmbeddingModel(model=model, counter=counter)
+        self.embed_model_name = model
+        self._embedding = None  # lazy init
+        self._counter = counter
         self.possible_embed = []
+
+    @property
+    def embedding(self):
+        if self._embedding is None:
+            if not self.embed_model_name:
+                raise RuntimeError(
+                    "Embedding model not configured. Set NERIF_DEFAULT_EMBEDDING_MODEL or pass embed_model parameter."
+                )
+            self._embedding = SimpleEmbeddingModel(model=self.embed_model_name, counter=self._counter)
+        return self._embedding
+
+    @property
+    def has_embedding(self) -> bool:
+        return bool(self.embed_model_name)
 
     def convert(self, val: Any):
         """
@@ -127,7 +155,7 @@ class Nerification(NerificationBase):
 
     def __init__(
         self,
-        model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
+        model=NERIF_DEFAULT_EMBEDDING_MODEL,
         counter: Optional[NerifTokenCounter] = None,
     ):
         super().__init__([True, False], model, counter)
@@ -156,7 +184,7 @@ class NerificationString(NerificationBase):
     def __init__(
         self,
         possible_values: Optional[List[str]] = None,
-        model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
+        model=NERIF_DEFAULT_EMBEDDING_MODEL,
         counter: Optional[NerifTokenCounter] = None,
     ):
         super().__init__(possible_values, model, counter)
@@ -182,10 +210,10 @@ class NerificationInt(NerificationBase):
     def __init__(
         self,
         possible_values: Optional[List[int]] = None,
-        model: str = NERIF_DEFAULT_EMBEDDING_MODEL,
+        model=NERIF_DEFAULT_EMBEDDING_MODEL,
         counter: Optional[NerifTokenCounter] = None,
     ):
-        super().__init__(possible_values, model)
+        super().__init__(possible_values, model, counter)
 
     def convert(self, val: Any):
         return str(val)
@@ -197,7 +225,10 @@ class NerificationInt(NerificationBase):
             return False
 
     def simple_fit(self, val: Any):
-        return int(super().simple_fit(val))
+        result = super().simple_fit(val)
+        if result is None:
+            return None
+        return int(result)
 
     def force_fit(self, val: Any, similarity="cosine"):
         return int(super().force_fit(val, similarity))
@@ -307,6 +338,26 @@ class Nerif:
         force_fit = self.verification.force_fit(response)
         return force_fit
 
+    def text_fallback_mode(self, text: str):
+        """Fallback when no embedding model is available. Uses LLM + string matching only."""
+        question = "<question>\n" + text + "</question>\n"
+        user_prompt = self.prompt.replace("<question>", question)
+        response = self.agent.chat(user_prompt, max_tokens=10)
+
+        # Try simple_fit first (substring match on "true"/"false")
+        simple_fit = self.verification.simple_fit(response)
+        if simple_fit is not None:
+            return simple_fit
+
+        # Try verify (exact match) - convert the response to the original value
+        if self.verification.verify(response):
+            converted = self.verification.convert(response)
+            idx = self.verification.possible.index(converted)
+            return self.verification.original_options[idx]
+
+        # Final fallback
+        return "true" in response.lower()
+
     def judge(self, text, max_retry=3):
         if self.debug:
             print("Judge, text:", text)
@@ -326,8 +377,11 @@ class Nerif:
                 else:
                     return result
 
-        # Use embedding mode as fallback
-        result = self.embedding_mode(text)
+        # Use embedding mode if available, otherwise text fallback
+        if self.verification.has_embedding:
+            result = self.embedding_mode(text)
+        else:
+            result = self.text_fallback_mode(text)
         return result
 
     @classmethod
@@ -401,9 +455,7 @@ class NerifMatchString:
         self.prompt += "</options>\n"
         self.prompt += "Now the question is:\n"
         self.prompt += "<question>\n"
-        self.prompt += (
-            "Choose the best choice from the following options.\n" "Only give me the choice ID, only a number: "
-        )
+        self.prompt += "Choose the best choice from the following options.\nOnly give me the choice ID, only a number: "
         self.temperature = temperature
         self.agent = SimpleChatModel(model=model, temperature=temperature, counter=counter)
         self.logits_agent = LogitsChatModel(model=model, temperature=temperature, counter=counter)
@@ -459,6 +511,27 @@ class NerifMatchString:
         force_fit = self.verification.force_fit(response)
         return force_fit
 
+    def text_fallback_mode(self, text, max_tokens=300):
+        """Fallback when no embedding model is available."""
+        question = (
+            "<question>\n" + text + "</question>\n"
+            "Choose the best route from the following options.\n"
+            "Tell me your analysis. Besides ID, I also need your analysis."
+        )
+        user_prompt = self.prompt.rsplit("<question>", 1)
+        user_prompt = user_prompt[0] + question + user_prompt[1]
+        response = self.agent.chat(user_prompt, max_tokens=max_tokens)
+
+        # Try exact match
+        if self.verification.verify(response):
+            return response
+        # Try simple_fit (substring)
+        simple_fit = self.verification.simple_fit(response)
+        if simple_fit is not None:
+            return simple_fit
+        # Final fallback: return 0
+        return 0
+
     def match(self, text, max_retry=3):
         self.agent.temperature = self.temperature
         try_id = 0
@@ -470,7 +543,10 @@ class NerifMatchString:
                 if result is not None:
                     return result
 
-        result = self.embedding_mode(text)
+        if self.verification.has_embedding:
+            result = self.embedding_mode(text)
+        else:
+            result = self.text_fallback_mode(text)
         return result
 
     @classmethod

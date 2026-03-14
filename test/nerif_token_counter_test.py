@@ -1,11 +1,9 @@
 import pprint
 import unittest
 
-from litellm import completion, embedding
-
 from nerif.core import nerif
 from nerif.model import SimpleChatModel, SimpleEmbeddingModel
-from nerif.utils import NerifTokenCounter
+from nerif.utils import NerifTokenCounter, get_embedding, get_model_response
 
 pretty_printer = pprint.PrettyPrinter()
 
@@ -13,12 +11,12 @@ pretty_printer = pprint.PrettyPrinter()
 class TestTokenCounter(unittest.TestCase):
     def test_counting_completion_raw(self):
         counter = NerifTokenCounter()
-        response = completion(
+        response = get_model_response(
             model="openrouter/openai/gpt-4o-2024-08-06",
             messages=[{"role": "user", "content": "Hello"}],
         )
         counter.count_from_response(response)
-        response = completion(
+        response = get_model_response(
             model="openrouter/openai/gpt-4o-2024-08-06",
             messages=[{"role": "user", "content": "Hello From World"}],
         )
@@ -26,17 +24,17 @@ class TestTokenCounter(unittest.TestCase):
 
         self.assertEqual(len(counter.model_token.model_cost), 1)
         self.assertGreater(
-            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].request,
+            counter.model_token["openai/gpt-4o-2024-08-06"].request,
             0,
         )
         self.assertGreater(
-            counter.model_token["openrouter/openai/gpt-4o-2024-08-06"].response,
+            counter.model_token["openai/gpt-4o-2024-08-06"].response,
             0,
         )
 
     def test_counting_embedding_raw(self):
         counter = NerifTokenCounter()
-        response = embedding(model="text-embedding-3-small", input="Hello")
+        response = get_embedding(model="text-embedding-3-small", messages="Hello")
         counter.count_from_response(response)
 
         self.assertEqual(len(counter.model_token.model_cost), 1)
@@ -45,14 +43,14 @@ class TestTokenCounter(unittest.TestCase):
 
     def test_counting_mixed_raw(self):
         counter = NerifTokenCounter()
-        response = completion(
+        response = get_model_response(
             model="openrouter/openai/gpt-4o-2024-08-06",
             messages=[{"role": "user", "content": "Hello"}],
         )
         counter.count_from_response(response)
-        response = embedding(model="text-embedding-3-small", input="Hello")
+        response = get_embedding(model="text-embedding-3-small", messages="Hello")
         counter.count_from_response(response)
-        response = completion(
+        response = get_model_response(
             model="openrouter/openai/gpt-3.5-turbo",
             messages=[{"role": "user", "content": "Hello From World"}],
         )
