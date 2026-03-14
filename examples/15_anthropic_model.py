@@ -2,7 +2,7 @@
 
 Requires: ANTHROPIC_API_KEY environment variable.
 """
-from nerif.model import SimpleChatModel, MultiModalMessage, ToolDefinition
+from nerif.model import SimpleChatModel, ToolDefinition
 
 # Basic chat
 model = SimpleChatModel(model="anthropic/claude-3-haiku-20240307")

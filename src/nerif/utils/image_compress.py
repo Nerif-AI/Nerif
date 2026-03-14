@@ -11,6 +11,8 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
+from PIL import Image
+
 logger = logging.getLogger(__name__)
 
 # Try to import the Rust native backend
@@ -23,9 +25,6 @@ except ImportError:
     _native = None
     _HAS_NATIVE = False
     logger.debug("nerif_native not available, using PIL fallback")
-
-# PIL is always available (it's a core dependency)
-from PIL import Image
 
 
 class ImageCompressor:

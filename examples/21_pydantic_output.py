@@ -5,9 +5,11 @@ and validated Pydantic object responses from LLMs.
 """
 
 from typing import List, Optional
+
 from pydantic import BaseModel
+
 from nerif.model import SimpleChatModel
-from nerif.utils import NerifFormat
+from nerif.utils import FormatVerifierPydantic, NerifFormat
 
 
 # Define structured output types
@@ -45,8 +47,6 @@ print(f"\nTrip to {plan.destination.name} for {plan.duration_days} days")
 print(f"Activities: {', '.join(plan.activities)}")
 
 # You can also use FormatVerifierPydantic directly
-from nerif.utils import FormatVerifierPydantic
-
 verifier = FormatVerifierPydantic(City)
 raw_json = '{"name": "London", "country": "UK", "population": 8900000, "famous_for": "Big Ben"}'
 city2 = verifier(raw_json)

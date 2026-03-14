@@ -34,8 +34,8 @@ pip install -e ".[dev]"          # Editable install with dev deps
 pip install -e ".[dev,pydantic]" # With Pydantic support
 pytest test/                     # Run all tests
 pytest test/nerif_format_test.py # Run specific test file
-ruff check src/ test/            # Lint
-ruff format src/ test/           # Format
+ruff check src/ test/ examples/  # Lint (must pass before committing)
+ruff format src/ test/ examples/ # Format
 ```
 
 ## Documentation
@@ -78,9 +78,20 @@ bumpver update --minor   # 1.1.0 -> 1.2.0
 
 No manual `twine upload` or `gh release create` needed — the CI handles everything.
 
+## Pre-commit Checklist
+
+Before committing code, always verify:
+
+```bash
+ruff check src/ test/ examples/  # Lint must pass (CI runs this)
+pytest test/                     # Tests must pass
+```
+
+The CI lint job (`lint.yml`) checks `src/`, `test/`, and `examples/` — all three directories. Forgetting `examples/` will cause CI failures.
+
 ## CI/CD
 
-- `.github/workflows/lint.yml` - Ruff linting on PRs
+- `.github/workflows/lint.yml` - Ruff linting on PRs (`ruff check src/ test/ examples/`)
 - `.github/workflows/release.yml` - Auto PyPI publish + GitHub release on version bump to `main`
 
 ## Environment Variables

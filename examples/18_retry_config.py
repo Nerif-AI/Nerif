@@ -5,7 +5,7 @@ with exponential backoff, jitter, and Retry-After header support.
 """
 
 from nerif.model import SimpleChatModel
-from nerif.utils import RetryConfig, NO_RETRY, AGGRESSIVE_RETRY
+from nerif.utils import AGGRESSIVE_RETRY, NO_RETRY, RetryConfig
 
 # Default: 3 retries with exponential backoff
 model = SimpleChatModel()

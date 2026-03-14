@@ -5,6 +5,7 @@ applications using asyncio.
 """
 
 import asyncio
+
 from nerif.model import SimpleChatModel, SimpleEmbeddingModel
 
 

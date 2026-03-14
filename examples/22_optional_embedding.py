@@ -4,7 +4,7 @@ Demonstrates that nerif() and nerif_match() work without embedding
 by falling back to text-based matching when embedding is disabled.
 """
 
-from nerif.core import nerif, nerif_match_string, Nerif, NerifMatchString
+from nerif.core import Nerif, NerifMatchString, nerif
 
 # When NERIF_DEFAULT_EMBEDDING_MODEL="" is set, embedding is disabled.
 # nerif() and nerif_match() will use text fallback instead of embedding mode.
