@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -251,6 +252,87 @@ def _resolve_endpoint(
 # ---------------------------------------------------------------------------
 
 
+def _convert_content_to_anthropic(content: Any) -> Any:
+    """Convert OpenAI-style message content to Anthropic format.
+
+    Handles:
+    - Plain strings (passed through)
+    - Content arrays with text, image_url, etc.
+    """
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return content
+
+    anthropic_parts = []
+    for part in content:
+        part_type = part.get("type", "")
+        if part_type == "text":
+            anthropic_parts.append({"type": "text", "text": part.get("text", "")})
+        elif part_type == "image_url":
+            image_url = part.get("image_url", {}).get("url", "")
+            if image_url.startswith("data:"):
+                # Parse data URI: data:<media_type>;base64,<data>
+                header, _, b64_data = image_url.partition(",")
+                media_type = header.split(":")[1].split(";")[0] if ":" in header else "image/jpeg"
+                anthropic_parts.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": b64_data,
+                    },
+                })
+            else:
+                anthropic_parts.append({
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": image_url,
+                    },
+                })
+        # Skip unsupported types (audio, video) silently
+    return anthropic_parts if anthropic_parts else content
+
+
+def _convert_tools_to_anthropic(tools: List[Any]) -> List[Dict[str, Any]]:
+    """Convert OpenAI tool format to Anthropic tool format.
+
+    OpenAI: {"type": "function", "function": {"name": ..., "description": ..., "parameters": ...}}
+    Anthropic: {"name": ..., "description": ..., "input_schema": ...}
+    """
+    anthropic_tools = []
+    for tool in tools:
+        func = tool.get("function", {})
+        anthropic_tools.append({
+            "name": func.get("name", ""),
+            "description": func.get("description", ""),
+            "input_schema": func.get("parameters", {"type": "object", "properties": {}}),
+        })
+    return anthropic_tools
+
+
+def _convert_tool_choice_to_anthropic(tool_choice: Any) -> Dict[str, Any]:
+    """Convert OpenAI tool_choice to Anthropic tool_choice format."""
+    if tool_choice is None:
+        return {"type": "auto"}
+    if isinstance(tool_choice, str):
+        if tool_choice == "auto":
+            return {"type": "auto"}
+        elif tool_choice == "none":
+            return {"type": "auto"}  # Anthropic doesn't have "none", use auto
+        elif tool_choice == "required":
+            return {"type": "any"}
+        else:
+            return {"type": "auto"}
+    if isinstance(tool_choice, dict):
+        # OpenAI: {"type": "function", "function": {"name": "..."}}
+        func = tool_choice.get("function", {})
+        if func.get("name"):
+            return {"type": "tool", "name": func["name"]}
+    return {"type": "auto"}
+
+
 def _anthropic_completion(
     base_url: str,
     api_key: str,
@@ -261,18 +343,57 @@ def _anthropic_completion(
     stream: bool = False,
     tools: Optional[List[Any]] = None,
     tool_choice: Optional[Any] = None,
+    response_format: Optional[Any] = None,
+    top_p: Optional[float] = None,
+    top_k: Optional[int] = None,
+    stop_sequences: Optional[List[str]] = None,
 ) -> ChatCompletionResponse:
     """Call the Anthropic Messages API and return a ChatCompletionResponse."""
     url = f"{base_url}/v1/messages"
 
-    # Separate system message from conversation
+    # Separate system message and convert content format
     system_text = None
     conversation = []
     for msg in messages:
-        if msg.get("role") == "system":
-            system_text = msg.get("content", "")
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "system":
+            system_text = content if isinstance(content, str) else str(content)
+        elif role == "tool":
+            # Convert OpenAI tool result to Anthropic tool_result format
+            conversation.append({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": msg.get("tool_call_id", ""),
+                    "content": content if isinstance(content, str) else str(content),
+                }],
+            })
+        elif role == "assistant":
+            # Check if this message has tool_calls (OpenAI format)
+            tool_calls = msg.get("tool_calls")
+            if tool_calls:
+                anthropic_content = []
+                if content:
+                    anthropic_content.append({"type": "text", "text": content})
+                for tc in tool_calls:
+                    func = tc.get("function", {}) if isinstance(tc, dict) else {"name": tc.function.name, "arguments": tc.function.arguments}
+                    try:
+                        input_data = json.loads(func.get("arguments", "{}"))
+                    except (ValueError, TypeError):
+                        input_data = {}
+                    tc_id = tc.get("id", "") if isinstance(tc, dict) else tc.id
+                    anthropic_content.append({
+                        "type": "tool_use",
+                        "id": tc_id,
+                        "name": func.get("name", ""),
+                        "input": input_data,
+                    })
+                conversation.append({"role": "assistant", "content": anthropic_content})
+            else:
+                conversation.append({"role": "assistant", "content": _convert_content_to_anthropic(content)})
         else:
-            conversation.append(msg)
+            conversation.append({"role": role, "content": _convert_content_to_anthropic(content)})
 
     body: Dict[str, Any] = {
         "model": model,
@@ -280,9 +401,23 @@ def _anthropic_completion(
         "max_tokens": max_tokens or 4096,
     }
     if system_text:
+        # If JSON mode requested, add instruction to system prompt
+        if response_format and isinstance(response_format, dict) and response_format.get("type") == "json_object":
+            system_text += "\n\nYou must respond with valid JSON only. No other text."
         body["system"] = system_text
+    elif response_format and isinstance(response_format, dict) and response_format.get("type") == "json_object":
+        body["system"] = "You must respond with valid JSON only. No other text."
     if temperature is not None:
         body["temperature"] = temperature
+    if top_p is not None:
+        body["top_p"] = top_p
+    if top_k is not None:
+        body["top_k"] = top_k
+    if stop_sequences is not None:
+        body["stop_sequences"] = stop_sequences
+    if tools is not None:
+        body["tools"] = _convert_tools_to_anthropic(tools)
+        body["tool_choice"] = _convert_tool_choice_to_anthropic(tool_choice)
 
     headers = {
         "x-api-key": api_key,
@@ -296,9 +431,31 @@ def _anthropic_completion(
 
     # Map Anthropic response to ChatCompletionResponse
     content_text = ""
+    tool_calls_list = []
     for block in data.get("content", []):
         if block.get("type") == "text":
             content_text += block.get("text", "")
+        elif block.get("type") == "tool_use":
+            tool_calls_list.append(
+                _ToolCall(
+                    id=block.get("id", ""),
+                    type="function",
+                    function=_FunctionCall(
+                        name=block.get("name", ""),
+                        arguments=json.dumps(block.get("input", {})),
+                    ),
+                )
+            )
+
+    message = _Message(
+        role="assistant",
+        content=content_text if content_text else None,
+        tool_calls=tool_calls_list if tool_calls_list else None,
+    )
+
+    # Map stop_reason to finish_reason
+    stop_reason = data.get("stop_reason", "end_turn")
+    finish_reason = "tool_calls" if stop_reason == "tool_use" else "stop"
 
     usage_data = data.get("usage", {})
     return ChatCompletionResponse(
@@ -307,8 +464,8 @@ def _anthropic_completion(
         choices=[
             _Choice(
                 index=0,
-                message=_Message(role="assistant", content=content_text),
-                finish_reason=data.get("stop_reason", "end_turn"),
+                message=message,
+                finish_reason=finish_reason,
             )
         ],
         usage=_Usage(
@@ -324,6 +481,66 @@ def _anthropic_completion(
 # ---------------------------------------------------------------------------
 
 
+def _convert_content_to_gemini_parts(content: Any) -> List[Dict[str, Any]]:
+    """Convert OpenAI-style message content to Gemini parts format."""
+    if isinstance(content, str):
+        return [{"text": content}]
+    if not isinstance(content, list):
+        return [{"text": str(content)}]
+
+    parts = []
+    for part in content:
+        part_type = part.get("type", "")
+        if part_type == "text":
+            parts.append({"text": part.get("text", "")})
+        elif part_type == "image_url":
+            image_url = part.get("image_url", {}).get("url", "")
+            if image_url.startswith("data:"):
+                # Parse data URI: data:<media_type>;base64,<data>
+                header, _, b64_data = image_url.partition(",")
+                mime_type = header.split(":")[1].split(";")[0] if ":" in header else "image/jpeg"
+                parts.append({"inlineData": {"mimeType": mime_type, "data": b64_data}})
+            else:
+                # Gemini supports file URIs, not HTTP URLs directly in inline data
+                parts.append({"text": f"[Image: {image_url}]"})
+    return parts if parts else [{"text": ""}]
+
+
+def _convert_tools_to_gemini(tools: List[Any]) -> List[Dict[str, Any]]:
+    """Convert OpenAI tool format to Gemini functionDeclarations format.
+
+    OpenAI: {"type": "function", "function": {"name": ..., "description": ..., "parameters": ...}}
+    Gemini: {"functionDeclarations": [{"name": ..., "description": ..., "parameters": ...}]}
+    """
+    declarations = []
+    for tool in tools:
+        func = tool.get("function", {})
+        decl: Dict[str, Any] = {
+            "name": func.get("name", ""),
+            "description": func.get("description", ""),
+        }
+        params = func.get("parameters")
+        if params:
+            decl["parameters"] = params
+        declarations.append(decl)
+    return declarations
+
+
+def _convert_tool_choice_to_gemini(tool_choice: Any) -> Dict[str, Any]:
+    """Convert OpenAI tool_choice to Gemini toolConfig format."""
+    if tool_choice is None or tool_choice == "auto":
+        return {"functionCallingConfig": {"mode": "AUTO"}}
+    if tool_choice == "none":
+        return {"functionCallingConfig": {"mode": "NONE"}}
+    if tool_choice == "required":
+        return {"functionCallingConfig": {"mode": "ANY"}}
+    if isinstance(tool_choice, dict):
+        func = tool_choice.get("function", {})
+        if func.get("name"):
+            return {"functionCallingConfig": {"mode": "ANY", "allowedFunctionNames": [func["name"]]}}
+    return {"functionCallingConfig": {"mode": "AUTO"}}
+
+
 def _gemini_completion(
     base_url: str,
     api_key: str,
@@ -332,6 +549,12 @@ def _gemini_completion(
     temperature: float = 0,
     max_tokens: Optional[int] = None,
     stream: bool = False,
+    tools: Optional[List[Any]] = None,
+    tool_choice: Optional[Any] = None,
+    response_format: Optional[Any] = None,
+    top_p: Optional[float] = None,
+    top_k: Optional[int] = None,
+    stop_sequences: Optional[List[str]] = None,
 ) -> ChatCompletionResponse:
     """Call the Google Gemini API and return a ChatCompletionResponse."""
     url = f"{base_url}/v1beta/models/{model}:generateContent?key={api_key}"
@@ -343,21 +566,73 @@ def _gemini_completion(
         role = msg.get("role", "user")
         content = msg.get("content", "")
         if role == "system":
-            system_instruction = content
+            system_instruction = content if isinstance(content, str) else str(content)
+        elif role == "tool":
+            # Convert tool result to Gemini function response
+            tool_call_id = msg.get("tool_call_id", "")
+            try:
+                response_data = json.loads(content) if isinstance(content, str) else content
+            except (ValueError, TypeError):
+                response_data = {"result": content}
+            contents.append({
+                "role": "user",
+                "parts": [{
+                    "functionResponse": {
+                        "name": tool_call_id,
+                        "response": response_data if isinstance(response_data, dict) else {"result": str(response_data)},
+                    }
+                }],
+            })
+        elif role == "assistant":
+            tool_calls = msg.get("tool_calls")
+            if tool_calls:
+                parts = []
+                if content:
+                    parts.append({"text": content})
+                for tc in tool_calls:
+                    func = tc.get("function", {}) if isinstance(tc, dict) else {"name": tc.function.name, "arguments": tc.function.arguments}
+                    try:
+                        args = json.loads(func.get("arguments", "{}"))
+                    except (ValueError, TypeError):
+                        args = {}
+                    parts.append({"functionCall": {"name": func.get("name", ""), "args": args}})
+                contents.append({"role": "model", "parts": parts})
+            else:
+                gemini_parts = _convert_content_to_gemini_parts(content)
+                contents.append({"role": "model", "parts": gemini_parts})
         else:
-            gemini_role = "model" if role == "assistant" else "user"
-            contents.append({"role": gemini_role, "parts": [{"text": content}]})
+            gemini_parts = _convert_content_to_gemini_parts(content)
+            contents.append({"role": "user", "parts": gemini_parts})
 
     body: Dict[str, Any] = {"contents": contents}
     if system_instruction:
         body["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+
     generation_config: Dict[str, Any] = {}
     if temperature is not None:
         generation_config["temperature"] = temperature
     if max_tokens is not None:
         generation_config["maxOutputTokens"] = max_tokens
+    if top_p is not None:
+        generation_config["topP"] = top_p
+    if top_k is not None:
+        generation_config["topK"] = top_k
+    if stop_sequences is not None:
+        generation_config["stopSequences"] = stop_sequences
+    if response_format and isinstance(response_format, dict):
+        if response_format.get("type") == "json_object":
+            generation_config["responseMimeType"] = "application/json"
+        elif response_format.get("type") == "json_schema":
+            generation_config["responseMimeType"] = "application/json"
+            schema = response_format.get("json_schema", {}).get("schema")
+            if schema:
+                generation_config["responseSchema"] = schema
     if generation_config:
         body["generationConfig"] = generation_config
+
+    if tools is not None:
+        body["tools"] = [{"functionDeclarations": _convert_tools_to_gemini(tools)}]
+        body["toolConfig"] = _convert_tool_choice_to_gemini(tool_choice)
 
     headers = {"content-type": "application/json"}
 
@@ -367,11 +642,33 @@ def _gemini_completion(
 
     # Map Gemini response to ChatCompletionResponse
     content_text = ""
+    tool_calls_list = []
     candidates = data.get("candidates", [])
     if candidates:
         parts = candidates[0].get("content", {}).get("parts", [])
         for part in parts:
-            content_text += part.get("text", "")
+            if "text" in part:
+                content_text += part["text"]
+            elif "functionCall" in part:
+                fc = part["functionCall"]
+                tool_calls_list.append(
+                    _ToolCall(
+                        id=fc.get("name", ""),  # Gemini doesn't provide IDs, use name
+                        type="function",
+                        function=_FunctionCall(
+                            name=fc.get("name", ""),
+                            arguments=json.dumps(fc.get("args", {})),
+                        ),
+                    )
+                )
+
+    message = _Message(
+        role="assistant",
+        content=content_text if content_text else None,
+        tool_calls=tool_calls_list if tool_calls_list else None,
+    )
+
+    finish_reason = "tool_calls" if tool_calls_list else "stop"
 
     usage_meta = data.get("usageMetadata", {})
     return ChatCompletionResponse(
@@ -380,8 +677,8 @@ def _gemini_completion(
         choices=[
             _Choice(
                 index=0,
-                message=_Message(role="assistant", content=content_text),
-                finish_reason="stop",
+                message=message,
+                finish_reason=finish_reason,
             )
         ],
         usage=_Usage(
@@ -614,6 +911,7 @@ def get_model_response(
             stream=stream,
             tools=tools,
             tool_choice=tool_choice,
+            response_format=response_format,
         )
     elif provider == "gemini":
         responses = _gemini_completion(
@@ -624,6 +922,9 @@ def get_model_response(
             temperature=temperature,
             max_tokens=max_tokens,
             stream=stream,
+            tools=tools,
+            tool_choice=tool_choice,
+            response_format=response_format,
         )
     else:
         # OpenAI-compatible (openai, openai_compat, openrouter, ollama, vllm, sllm)
