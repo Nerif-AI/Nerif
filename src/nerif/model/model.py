@@ -16,6 +16,9 @@ from ..utils import (
     get_model_response_stream_async,
     get_response,
 )
+from ..utils.callbacks import CallbackManager
+from ..utils.fallback import FallbackConfig
+from ..utils.rate_limit import RateLimiter
 from ..utils.retry import RetryConfig
 
 
@@ -127,6 +130,9 @@ class SimpleChatModel:
         max_tokens: None | int = None,
         retry_config: Optional[RetryConfig] = None,
         memory: Optional[Any] = None,
+        fallback: Optional[List[str]] = None,
+        callbacks: Optional[CallbackManager] = None,
+        rate_limiter: Optional[RateLimiter] = None,
     ):
         self.model = model
         self.temperature = temperature
@@ -135,6 +141,11 @@ class SimpleChatModel:
         self.agent_max_tokens = max_tokens
         self.retry_config = retry_config
         self.memory = memory
+        self.callbacks = callbacks
+        self.rate_limiter = rate_limiter
+        self.fallback_config = None
+        if fallback:
+            self.fallback_config = FallbackConfig(models=[model] + fallback)
 
         if memory is not None:
             # Use the memory's internal list as the canonical message store.
@@ -158,6 +169,38 @@ class SimpleChatModel:
 
     def set_max_tokens(self, max_tokens: None | int = None):
         self.agent_max_tokens = max_tokens
+
+    def _call_with_fallback(self, call_fn, kwargs):
+        """Try primary model, then each fallback in order."""
+        if self.fallback_config is None:
+            return call_fn(**kwargs)
+        last_exception = None
+        for model_name in self.fallback_config.models:
+            try:
+                kwargs["model"] = model_name
+                return call_fn(**kwargs)
+            except Exception as e:
+                last_exception = e
+                if not self.fallback_config.should_fallback(e):
+                    raise
+                LOGGER.warning("Model %s failed, trying next fallback: %s", model_name, e)
+        raise last_exception
+
+    async def _call_with_fallback_async(self, call_fn, kwargs):
+        """Async version of _call_with_fallback."""
+        if self.fallback_config is None:
+            return await call_fn(**kwargs)
+        last_exception = None
+        for model_name in self.fallback_config.models:
+            try:
+                kwargs["model"] = model_name
+                return await call_fn(**kwargs)
+            except Exception as e:
+                last_exception = e
+                if not self.fallback_config.should_fallback(e):
+                    raise
+                LOGGER.warning("Model %s failed, trying next fallback: %s", model_name, e)
+        raise last_exception
 
     def chat(
         self,
@@ -237,7 +280,7 @@ class SimpleChatModel:
         LOGGER.debug("requested with message: %s", self.messages)
         LOGGER.debug("arguments of request: %s", kwargs)
 
-        result = get_model_response(self.messages, **kwargs)
+        result = self._call_with_fallback(lambda **kw: get_model_response(self.messages, **kw), kwargs)
 
         choice = result.choices[0]
 
@@ -309,6 +352,10 @@ class SimpleChatModel:
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
+        if self.counter is not None:
+            kwargs["counter"] = self.counter
+        if self.retry_config is not None:
+            kwargs["retry_config"] = self.retry_config
 
         full_response = []
         for chunk in get_model_response_stream(self.messages, **kwargs):
@@ -387,7 +434,9 @@ class SimpleChatModel:
         LOGGER.debug("requested with message: %s", self.messages)
         LOGGER.debug("arguments of request: %s", kwargs)
 
-        result = await get_model_response_async(self.messages, **kwargs)
+        result = await self._call_with_fallback_async(
+            lambda **kw: get_model_response_async(self.messages, **kw), kwargs
+        )
 
         choice = result.choices[0]
 
@@ -454,6 +503,10 @@ class SimpleChatModel:
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
+        if self.counter is not None:
+            kwargs["counter"] = self.counter
+        if self.retry_config is not None:
+            kwargs["retry_config"] = self.retry_config
 
         full_response = []
         async for chunk in get_model_response_stream_async(self.messages, **kwargs):

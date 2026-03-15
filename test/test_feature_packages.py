@@ -1,7 +1,6 @@
 """Tests for optional feature subpackage organization (nerif[img-gen], nerif[asr], nerif[tts])."""
 
 
-
 # ---------------------------------------------------------------------------
 # nerif.img_gen subpackage exports
 # ---------------------------------------------------------------------------
@@ -47,20 +46,15 @@ class TestAsrExports:
 
         assert AudioModel is not None
 
-    def test_exports_multimodal_message(self):
-        from nerif.asr import MultiModalMessage
+    def test_exports_transcriber(self):
+        from nerif.asr import Transcriber
 
-        assert MultiModalMessage is not None
-
-    def test_exports_simple_chat_model(self):
-        from nerif.asr import SimpleChatModel
-
-        assert SimpleChatModel is not None
+        assert Transcriber is not None
 
     def test_all_list_matches_exports(self):
         import nerif.asr as pkg
 
-        expected = {"AudioInferenceModel", "AudioModel", "MultiModalMessage", "SimpleChatModel"}
+        expected = {"AudioInferenceModel", "AudioModel", "Transcriber"}
         assert set(pkg.__all__) == expected
 
 
@@ -78,20 +72,15 @@ class TestTtsExports:
 
         assert AudioInferenceModel is not None
 
-    def test_exports_multimodal_message(self):
-        from nerif.tts import MultiModalMessage
+    def test_exports_synthesizer(self):
+        from nerif.tts import Synthesizer
 
-        assert MultiModalMessage is not None
-
-    def test_exports_simple_chat_model(self):
-        from nerif.tts import SimpleChatModel
-
-        assert SimpleChatModel is not None
+        assert Synthesizer is not None
 
     def test_all_list_matches_exports(self):
         import nerif.tts as pkg
 
-        expected = {"AudioInferenceModel", "MultiModalMessage", "SimpleChatModel", "SpeechModel"}
+        expected = {"AudioInferenceModel", "SpeechModel", "Synthesizer"}
         assert set(pkg.__all__) == expected
 
 
@@ -112,12 +101,14 @@ class TestLazyImport:
         mod = nerif.asr
         assert hasattr(mod, "AudioInferenceModel")
         assert hasattr(mod, "AudioModel")
+        assert hasattr(mod, "Transcriber")
 
     def test_nerif_lazy_loads_tts(self):
         import nerif
 
         mod = nerif.tts
         assert hasattr(mod, "SpeechModel")
+        assert hasattr(mod, "Synthesizer")
 
     def test_nerif_getattr_raises_for_unknown(self):
         import nerif
@@ -182,15 +173,3 @@ class TestCrossPackageIdentity:
         from nerif.tts import AudioInferenceModel as TtsAIM
 
         assert AsrAIM is TtsAIM
-
-    def test_asr_multimodal_message_matches_model_multimodal_message(self):
-        from nerif.asr import MultiModalMessage as AsrMM
-        from nerif.model import MultiModalMessage as ModelMM
-
-        assert AsrMM is ModelMM
-
-    def test_tts_simple_chat_model_matches_model_simple_chat_model(self):
-        from nerif.model import SimpleChatModel as ModelSCM
-        from nerif.tts import SimpleChatModel as TtsSCM
-
-        assert TtsSCM is ModelSCM

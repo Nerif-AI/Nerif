@@ -1,3 +1,16 @@
+from .callbacks import (
+    CallbackHandler,
+    CallbackManager,
+    FallbackEvent,
+    LLMEndEvent,
+    LLMErrorEvent,
+    LLMStartEvent,
+    LoggingCallbackHandler,
+    MemoryEvent,
+    RetryEvent,
+    ToolCallEvent,
+)
+from .fallback import FallbackConfig
 from .format import (
     FormatVerifierBase,
     FormatVerifierFloat,
@@ -8,6 +21,8 @@ from .format import (
     NerifFormat,
 )
 from .log import NerifFormatter, set_up_logging, timestamp_filename
+from .prompt import PromptTemplate
+from .rate_limit import RateLimitConfig, RateLimiter, RateLimiterRegistry, rate_limiters
 from .retry import AGGRESSIVE_RETRY, DEFAULT_RETRY, NO_RETRY, RetryConfig, retry_async, retry_sync
 from .token_counter import ModelCost, NerifTokenCounter, OllamaResponseParser, OpenAIResponseParser, ResponseParserBase
 from .utils import (
@@ -125,4 +140,24 @@ __all__ = [
     "OPENAI_EMBEDDING_MODEL",
     # default logger
     "LOGGER",
+    # prompt
+    "PromptTemplate",
+    # callbacks
+    "CallbackHandler",
+    "CallbackManager",
+    "LoggingCallbackHandler",
+    "LLMStartEvent",
+    "LLMEndEvent",
+    "LLMErrorEvent",
+    "ToolCallEvent",
+    "FallbackEvent",
+    "RetryEvent",
+    "MemoryEvent",
+    # fallback
+    "FallbackConfig",
+    # rate limiting
+    "RateLimitConfig",
+    "RateLimiter",
+    "RateLimiterRegistry",
+    "rate_limiters",
 ]
