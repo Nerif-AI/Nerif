@@ -121,7 +121,7 @@ data = NerifFormat.json_parse('The answer is {"result": 42} as expected.')
 
 ### Pydantic 模型提取
 
-`FormatVerifierPydantic` 将 LLM 输出验证并解析为 Pydantic 模型实例。需要安装 `pip install nerif[pydantic]`。
+`FormatVerifierPydantic` 将 LLM 输出验证并解析为 Pydantic 模型实例。Pydantic 自 v1.3 起已作为核心依赖内置。
 
 ```python title="示例：Pydantic 模型提取"
 from pydantic import BaseModel

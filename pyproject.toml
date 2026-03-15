@@ -20,6 +20,7 @@ classifiers = [
 keywords = ["llm", "ai", "natural-language", "python", "nerif"]
 dependencies = [
     "httpx",
+    "pydantic>=2.0",
 ]
 requires-python = ">=3.10"
 
@@ -38,7 +39,6 @@ img-gen = ["Pillow>=9.0.0", "requests"]
 asr = []
 tts = []
 native = ["nerif_native"]
-pydantic = ["pydantic>=2.0"]
 
 [project.scripts]
 nerif = "nerif.cli.main:main"

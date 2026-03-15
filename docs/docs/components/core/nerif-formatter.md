@@ -121,7 +121,7 @@ data = NerifFormat.json_parse('The answer is {"result": 42} as expected.')
 
 ### Pydantic Model Extraction
 
-`FormatVerifierPydantic` validates and parses LLM output into Pydantic model instances. Requires `pip install nerif[pydantic]`.
+`FormatVerifierPydantic` validates and parses LLM output into Pydantic model instances. Pydantic is included as a core dependency since v1.3.
 
 ```python title="Example: Pydantic model extraction"
 from pydantic import BaseModel

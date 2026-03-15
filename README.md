@@ -39,10 +39,8 @@ pip install nerif
 Optional feature groups:
 
 ```bash
-pip install "nerif[img-gen]"
-pip install "nerif[asr]"
-pip install "nerif[tts]"
-pip install "nerif[pydantic]"
+pip install "nerif[rag]"      # NumPy vector store for RAG
+pip install "nerif[img-gen]"   # Image generation (Pillow)
 ```
 
 ## QuickStart
@@ -63,103 +61,34 @@ else:
     print(model.chat("what is the color of the sky?"))
 ```
 
-## v1.1 Features
+## Changelog
 
-### Streaming
+### v1.3.0
 
-```python
-from nerif.model import SimpleChatModel
+- Async agent: `NerifAgent.arun()` with concurrent tool execution
+- Model fallback chain: automatic failover on transient errors
+- Callback/hook system: 7 event types for observability
+- `PromptTemplate`: variable substitution, defaults, conditional sections
+- Rate limiting: per-model/provider request throttling
+- Enhanced ASR: `Transcriber` with language/format/translate support
+- Enhanced TTS: `Synthesizer` with voice/speed/format/file output
+- Streaming now supports token counting and retry
 
-model = SimpleChatModel()
-for chunk in model.stream_chat("Tell me a story"):
-    print(chunk, end="", flush=True)
-```
+### v1.2.0
 
-### Async Support
+- `ConversationMemory`: sliding window with auto-summarization
+- `NerifTokenCounter`: latency, cost, success rate tracking
+- Lightweight RAG with `NumpyVectorStore`
+- Custom exception hierarchy (`NerifError`, `ProviderError`, etc.)
+- CLI tools: `nerif check`, `nerif test-model`, `nerif models`
 
-```python
-import asyncio
-from nerif.model import SimpleChatModel
+### v1.1.0
 
-async def main():
-    model = SimpleChatModel()
-    result = await model.achat("Hello!")
-    print(result)
-
-asyncio.run(main())
-```
-
-### Pydantic Structured Output
-
-```python
-from pydantic import BaseModel
-from nerif.model import SimpleChatModel
-
-class City(BaseModel):
-    name: str
-    country: str
-    population: int
-
-model = SimpleChatModel()
-city = model.chat("Tell me about Tokyo.", response_model=City)
-print(f"{city.name}: {city.population:,}")
-```
-
-### Retry Configuration
-
-```python
-from nerif.model import SimpleChatModel
-from nerif.utils import RetryConfig
-
-model = SimpleChatModel(retry_config=RetryConfig(max_retries=5))
-```
-
-### Optional Embedding
-
-```python
-from nerif.core import Nerif
-
-# Works without embedding model
-judge = Nerif(model="gpt-4o", embed_model=None)
-result = judge.judge("the sky is blue")
-```
-
-## v1.2.0 Features
-
-### Conversation Memory
-
-Sliding window and token-based context management with auto-summarization and persistence.
-
-### Enhanced Observability
-
-Latency tracking, cost calculation, success/failure rates, and callback hooks via `NerifTokenCounter`.
-
-### Lightweight RAG
-
-Abstract vector store interface with built-in NumPy implementation for retrieval-augmented generation.
-
-### Custom Exceptions
-
-Structured error hierarchy: `NerifError`, `ProviderError`, `FormatError`, `ConfigError`.
-
-### CLI Tools
-
-```bash
-nerif check        # Verify environment and API keys
-nerif test-model   # Test model connectivity
-nerif models       # List available models
-```
-
-### Type Hints
-
-`py.typed` marker included for full IDE and mypy support.
-
-### Installation
-
-```bash
-pip install nerif           # Core features
-pip install nerif[pydantic] # + Pydantic structured output
-```
+- Streaming and async support (`stream_chat`, `achat`)
+- Pydantic structured output (`response_model=`)
+- Retry with exponential backoff (`RetryConfig`)
+- Optional embedding model
+- Multi-provider routing (OpenAI, Anthropic, Gemini, Ollama, etc.)
 
 ## Documentation
 
