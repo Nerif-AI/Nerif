@@ -1,11 +1,33 @@
 from . import agent, batch, core, model, utils
+from .exceptions import (
+    ConfigError,
+    ConversationMemoryError,
+    FormatError,
+    ModelNotFoundError,
+    NerifError,
+    ProviderError,
+    TokenLimitError,
+)
 
-__all__ = ["agent", "batch", "core", "model", "utils"]
+__all__ = [
+    "agent",
+    "batch",
+    "core",
+    "model",
+    "utils",
+    "NerifError",
+    "ProviderError",
+    "FormatError",
+    "ConfigError",
+    "ConversationMemoryError",
+    "ModelNotFoundError",
+    "TokenLimitError",
+]
 
 
 def __getattr__(name):
     """Lazy import for optional feature subpackages."""
-    if name in ("asr", "img_gen", "tts"):
+    if name in ("asr", "img_gen", "tts", "rag", "memory"):
         import importlib
 
         mod = importlib.import_module(f".{name}", __name__)

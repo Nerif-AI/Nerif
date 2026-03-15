@@ -1,12 +1,15 @@
 import json
 import logging
+import math
 import os
+import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
 import httpx
-import numpy as np
+
+from nerif.exceptions import ProviderError
 
 from .retry import DEFAULT_RETRY, RetryConfig, retry_async, retry_sync
 from .token_counter import NerifTokenCounter
@@ -51,14 +54,20 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 
 def similarity_dist(vec1, vec2, func="cosine"):
-    if type(vec1) is list:
-        vec1 = np.array(vec1)
-    if type(vec2) is list:
-        vec2 = np.array(vec2)
+    """Compute distance between two vectors. Pure Python — no numpy required."""
+    if not isinstance(vec1, (list, tuple)):
+        vec1 = list(vec1)
+    if not isinstance(vec2, (list, tuple)):
+        vec2 = list(vec2)
     if func == "cosine":
-        return 1 - (vec1 @ vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+        dot = sum(a * b for a, b in zip(vec1, vec2))
+        norm1 = math.sqrt(sum(a * a for a in vec1))
+        norm2 = math.sqrt(sum(b * b for b in vec2))
+        if norm1 == 0 or norm2 == 0:
+            return 1.0
+        return 1 - dot / (norm1 * norm2)
     else:
-        return np.linalg.norm(vec1 - vec2)
+        return math.sqrt(sum((a - b) ** 2 for a, b in zip(vec1, vec2)))
 
 
 # OpenAI Models
@@ -1852,7 +1861,15 @@ def get_embedding(
     def _call():
         return _openai_compatible_embedding(effective_base, effective_key, effective_model, messages)
 
-    response = retry_sync(_call, retry_config=retry_config or DEFAULT_RETRY)
+    try:
+        response = retry_sync(_call, retry_config=retry_config or DEFAULT_RETRY)
+    except httpx.HTTPStatusError as exc:
+        raise ProviderError(
+            str(exc),
+            provider=provider,
+            status_code=exc.response.status_code,
+            response=exc.response,
+        ) from exc
 
     if counter is not None:
         counter.set_parser_based_on_model(model)
@@ -1945,11 +1962,27 @@ def get_model_response(
                 response_format=response_format,
             )
 
-    responses = retry_sync(_call, retry_config=retry_config or DEFAULT_RETRY)
+    _start = time.monotonic()
+    try:
+        responses = retry_sync(_call, retry_config=retry_config or DEFAULT_RETRY)
+    except httpx.HTTPStatusError as exc:
+        _latency = (time.monotonic() - _start) * 1000.0
+        if counter is not None:
+            counter.record_request(model, latency_ms=_latency, success=False, error=exc)
+        raise ProviderError(
+            str(exc),
+            provider=provider,
+            status_code=exc.response.status_code,
+            response=exc.response,
+        ) from exc
 
+    _latency = (time.monotonic() - _start) * 1000.0
     if counter is not None:
         counter.set_parser_based_on_model(model)
         counter.count_from_response(responses)
+        _pt = responses.usage.prompt_tokens if hasattr(responses, "usage") else 0
+        _ct = responses.usage.completion_tokens if hasattr(responses, "usage") else 0
+        counter.record_request(model, latency_ms=_latency, success=True, prompt_tokens=_pt, completion_tokens=_ct)
 
     return responses
 
@@ -2016,11 +2049,27 @@ async def get_model_response_async(
                 response_format=response_format,
             )
 
-    responses = await retry_async(_call, retry_config=retry_config or DEFAULT_RETRY)
+    _start = time.monotonic()
+    try:
+        responses = await retry_async(_call, retry_config=retry_config or DEFAULT_RETRY)
+    except httpx.HTTPStatusError as exc:
+        _latency = (time.monotonic() - _start) * 1000.0
+        if counter is not None:
+            counter.record_request(model, latency_ms=_latency, success=False, error=exc)
+        raise ProviderError(
+            str(exc),
+            provider=provider,
+            status_code=exc.response.status_code,
+            response=exc.response,
+        ) from exc
 
+    _latency = (time.monotonic() - _start) * 1000.0
     if counter is not None:
         counter.set_parser_based_on_model(model)
         counter.count_from_response(responses)
+        _pt = responses.usage.prompt_tokens if hasattr(responses, "usage") else 0
+        _ct = responses.usage.completion_tokens if hasattr(responses, "usage") else 0
+        counter.record_request(model, latency_ms=_latency, success=True, prompt_tokens=_pt, completion_tokens=_ct)
 
     return responses
 
@@ -2042,7 +2091,15 @@ async def get_embedding_async(
     async def _call():
         return await _openai_compatible_embedding_async(effective_base, effective_key, effective_model, messages)
 
-    response = await retry_async(_call, retry_config=retry_config or DEFAULT_RETRY)
+    try:
+        response = await retry_async(_call, retry_config=retry_config or DEFAULT_RETRY)
+    except httpx.HTTPStatusError as exc:
+        raise ProviderError(
+            str(exc),
+            provider=provider,
+            status_code=exc.response.status_code,
+            response=exc.response,
+        ) from exc
 
     if counter is not None:
         counter.set_parser_based_on_model(model)

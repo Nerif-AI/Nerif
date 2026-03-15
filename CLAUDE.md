@@ -11,11 +11,17 @@ Nerif/
 │   ├── model/          # SimpleChatModel, LogitsChatModel, VisionModel, AudioModel
 │   ├── agent/          # NerifAgent, Tool - ReAct-style tool calling agent
 │   ├── batch/          # Batch API processing (OpenAI-compatible)
+│   ├── memory/         # ConversationMemory - sliding window, summarization, persistence
+│   ├── rag/            # SimpleRAG, NumpyVectorStore, VectorStoreBase
 │   ├── utils/          # NerifFormat, NerifTokenCounter, RetryConfig, logging
+│   ├── exceptions.py   # Structured exception hierarchy (NerifError, ProviderError, etc.)
 │   ├── asr/            # Audio speech recognition (optional: nerif[asr])
 │   ├── tts/            # Text-to-speech (optional: nerif[tts])
 │   ├── img_gen/        # Image generation (optional: nerif[img-gen])
-│   └── cli/            # CLI utilities (image compression)
+│   └── cli/            # CLI utilities
+│       ├── main.py     # CLI entry point
+│       ├── check.py    # Environment/config checker
+│       └── test_model.py  # Model connectivity tester
 ├── docs/               # Docusaurus 3.5.2 documentation site
 │   ├── docs/           # Markdown documentation content (English)
 │   ├── i18n/zh-Hans/   # Chinese (Simplified) translations
@@ -36,6 +42,10 @@ pytest test/                     # Run all tests
 pytest test/nerif_format_test.py # Run specific test file
 ruff check src/ test/ examples/  # Lint (must pass before committing)
 ruff format src/ test/ examples/ # Format
+
+# CLI commands (after install)
+nerif check                      # Check environment and API key config
+nerif test-model                 # Test model connectivity
 ```
 
 ## Documentation
@@ -54,7 +64,10 @@ Documentation is bilingual (English + Chinese). When updating docs:
 - **core**: `nerif(text)` returns bool judgment; `nerif_match_string(selections, text)` returns best match index. Uses three-tier approach: logits mode → embedding mode (or text fallback) → force_fit. Embedding is optional since v1.1.
 - **model**: `SimpleChatModel` for chat (sync/async/streaming), `LogitsChatModel` for logprobs, `MultiModalMessage` for vision, `ToolDefinition` for tool calling. Supports `retry_config` and `response_model` (Pydantic).
 - **agent**: `NerifAgent` with `Tool` registration for multi-step ReAct loops.
+- **memory**: `ConversationMemory` for sliding-window conversation history with optional LLM-based summarization and JSON persistence.
+- **rag**: `SimpleRAG` with `NumpyVectorStore` for lightweight retrieval-augmented generation. Extend `VectorStoreBase` for custom backends (ChromaDB, FAISS, etc.).
 - **utils**: `NerifFormat` for parsing LLM outputs (int, float, list, JSON, JSON schema, Pydantic). `NerifTokenCounter` for tracking token usage. `RetryConfig` for retry with exponential backoff.
+- **exceptions**: Structured hierarchy — `NerifError`, `ProviderError`, `FormatError` (also `ValueError`), `ConversationMemoryError`, `ConfigError`, `ModelNotFoundError`, `TokenLimitError`.
 
 ## Version Management
 

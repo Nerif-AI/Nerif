@@ -53,6 +53,12 @@ print(f"Best match: {choices[idx]}")
 - **自动重试** — 通过 `RetryConfig` 实现指数退避的自动重试机制
 - **Pydantic 输出** — `response_model=MyModel` 直接返回验证后的 Pydantic 对象
 - **Embedding 可选** — `nerif()` 无需 embedding 模型也能工作，使用文本回退匹配
+- **对话记忆** — 基于滑动窗口和 Token 的上下文管理，支持自动摘要和持久化
+- **增强可观测性** — 延迟追踪、成本计算、成功/失败率统计，以及回调钩子
+- **轻量级 RAG** — 抽象向量存储接口，内置 NumPy 实现，支持检索增强生成
+- **自定义异常** — 结构化错误层次体系（`NerifError`、`ProviderError`、`FormatError`、`ConfigError`）
+- **CLI 工具** — `nerif check`、`nerif test-model`、`nerif models` 命令
+- **类型提示** — 包含 `py.typed` 标记，完整支持 IDE 和 mypy
 
 ## 安装
 
