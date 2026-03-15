@@ -1,9 +1,12 @@
 import json
 import logging
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..model.model import SimpleChatModel, ToolCallResult
 from .tool import Tool
+
+if TYPE_CHECKING:
+    from ..memory.conversation import ConversationMemory
 
 LOGGER = logging.getLogger("Nerif")
 
@@ -31,12 +34,14 @@ class NerifAgent:
         temperature: float = 0.0,
         max_tokens: int | None = None,
         max_iterations: int = 10,
+        memory: Optional["ConversationMemory"] = None,
     ):
         self.model = SimpleChatModel(
             model=model,
             default_prompt=system_prompt,
             temperature=temperature,
             max_tokens=max_tokens,
+            memory=memory,
         )
         self.tools: Dict[str, Tool] = {}
         self.max_iterations = max_iterations
@@ -94,7 +99,11 @@ class NerifAgent:
             if not isinstance(result, list):
                 return str(result)
 
-            # Execute each tool call and add results to conversation
+            # Execute each tool call and add results to conversation.
+            # Tool messages are appended directly to self.model.messages (which is
+            # memory._messages when memory is active). We intentionally bypass
+            # memory.add_message() here because tool results are part of the current
+            # reasoning turn and should not trigger window management mid-turn.
             for tool_call in result:
                 tool_result = self._execute_tool_call(tool_call)
                 self.model.messages.append(

@@ -124,6 +124,43 @@ judge = Nerif(model="gpt-4o", embed_model=None)
 result = judge.judge("the sky is blue")
 ```
 
+## v1.2.0 Features
+
+### Conversation Memory
+
+Sliding window and token-based context management with auto-summarization and persistence.
+
+### Enhanced Observability
+
+Latency tracking, cost calculation, success/failure rates, and callback hooks via `NerifTokenCounter`.
+
+### Lightweight RAG
+
+Abstract vector store interface with built-in NumPy implementation for retrieval-augmented generation.
+
+### Custom Exceptions
+
+Structured error hierarchy: `NerifError`, `ProviderError`, `FormatError`, `ConfigError`.
+
+### CLI Tools
+
+```bash
+nerif check        # Verify environment and API keys
+nerif test-model   # Test model connectivity
+nerif models       # List available models
+```
+
+### Type Hints
+
+`py.typed` marker included for full IDE and mypy support.
+
+### Installation
+
+```bash
+pip install nerif           # Core features
+pip install nerif[pydantic] # + Pydantic structured output
+```
+
 ## Documentation
 
 More detailed documentation is on the [official website](https://nerif-ai.com).

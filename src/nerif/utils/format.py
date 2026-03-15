@@ -1,6 +1,8 @@
 import json
 import re
 
+from nerif.exceptions import FormatError
+
 try:
     from pydantic import BaseModel as PydanticBaseModel
     from pydantic import ValidationError as PydanticValidationError
@@ -33,7 +35,11 @@ class FormatVerifierBase:
             if res is not None:
                 return res
             else:
-                raise ValueError("Cannot convert {} to {}".format(val, self.cls.__name__))
+                raise FormatError(
+                    "Cannot convert {} to {}".format(val, self.cls.__name__),
+                    raw_output=val,
+                    expected_type=self.cls,
+                )
 
 
 class FormatVerifierInt(FormatVerifierBase):

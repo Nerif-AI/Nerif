@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nerif"
-version = "1.1.0"
+version = "1.2.0"
 
 description = "LLM powered Python"
 readme = "README.md"
@@ -19,10 +19,7 @@ classifiers = [
 ]
 keywords = ["feed", "reader", "tutorial"]
 dependencies = [
-    "numpy",
     "httpx",
-    "python-dotenv",
-    "prettytable",
 ]
 requires-python = ">=3.10"
 
@@ -34,7 +31,8 @@ addopts = ["--import-mode=importlib"]
 pythonpath = ["src"]
 
 [project.optional-dependencies]
-dev = ["bumpver", "ruff", "pip-tools", "pytest", "pytest-asyncio", "ipython", "isort"]
+dev = ["bumpver", "ruff", "pytest", "pytest-asyncio"]
+rag = ["numpy"]
 image = ["Pillow>=9.0.0", "requests"]
 img-gen = ["Pillow>=9.0.0", "requests"]
 asr = []
@@ -42,11 +40,15 @@ tts = []
 native = ["nerif_native"]
 pydantic = ["pydantic>=2.0"]
 
+[project.scripts]
+nerif = "nerif.cli.main:main"
+nerif-compress = "nerif.cli.compress_image:main"
+
 [project.urls]
 Homepage = "https://nerif-ai.com"
 
 [tool.bumpver]
-current_version = "1.1.0"
+current_version = "1.2.0"
 
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "release: Bump version {old_version} -> {new_version}"

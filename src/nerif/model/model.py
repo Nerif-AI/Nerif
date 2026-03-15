@@ -115,6 +115,7 @@ class SimpleChatModel:
         counter (NerifTokenCounter): Token counter instance.
         messages (List[Any]): The conversation history.
         max_tokens (int): The maximum number of tokens to generate in the response.
+        memory: Optional ConversationMemory for managed conversation history.
     """
 
     def __init__(
@@ -125,21 +126,35 @@ class SimpleChatModel:
         counter: NerifTokenCounter = None,
         max_tokens: None | int = None,
         retry_config: Optional[RetryConfig] = None,
+        memory: Optional[Any] = None,
     ):
         self.model = model
         self.temperature = temperature
         self.default_prompt = default_prompt
-        self.messages: List[Any] = [
-            {"role": "system", "content": default_prompt},
-        ]
         self.counter = counter
         self.agent_max_tokens = max_tokens
         self.retry_config = retry_config
+        self.memory = memory
+
+        if memory is not None:
+            # Use the memory's internal list as the canonical message store.
+            # Seed the system message via memory so window management is aware.
+            memory.add_message("system", default_prompt)
+            self.messages: List[Any] = memory._messages
+        else:
+            self.messages: List[Any] = [
+                {"role": "system", "content": default_prompt},
+            ]
 
     def reset(self, prompt: Optional[str] = None) -> None:
         if prompt is None:
             prompt = self.default_prompt
-        self.messages: List[Any] = [{"role": "system", "content": prompt}]
+        if self.memory is not None:
+            self.memory.clear()
+            self.memory.add_message("system", prompt)
+            self.messages = self.memory._messages
+        else:
+            self.messages: List[Any] = [{"role": "system", "content": prompt}]
 
     def set_max_tokens(self, max_tokens: None | int = None):
         self.agent_max_tokens = max_tokens
@@ -174,7 +189,10 @@ class SimpleChatModel:
             new_message = {"role": "user", "content": message.to_content()}
         else:
             new_message = {"role": "user", "content": message}
-        self.messages.append(new_message)
+        if self.memory is not None:
+            self.memory.add_message(new_message["role"], new_message["content"])
+        else:
+            self.messages.append(new_message)
 
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
@@ -234,14 +252,23 @@ class SimpleChatModel:
                 for tc in choice.message.tool_calls
             ]
             if append:
-                self.messages.append({"role": "assistant", "content": None, "tool_calls": choice.message.tool_calls})
+                assistant_msg = {"role": "assistant", "content": None, "tool_calls": choice.message.tool_calls}
+                if self.memory is not None:
+                    self.memory.add_message("assistant", None)
+                    # Patch the last appended message to include tool_calls
+                    self.memory._messages[-1]["tool_calls"] = choice.message.tool_calls
+                else:
+                    self.messages.append(assistant_msg)
             else:
                 self.reset()
             return tool_results
 
         text_result = choice.message.content
         if append:
-            self.messages.append({"role": "assistant", "content": text_result})
+            if self.memory is not None:
+                self.memory.add_message("assistant", text_result)
+            else:
+                self.messages.append({"role": "assistant", "content": text_result})
         else:
             self.reset()
 
@@ -268,7 +295,10 @@ class SimpleChatModel:
             new_message = {"role": "user", "content": message.to_content()}
         else:
             new_message = {"role": "user", "content": message}
-        self.messages.append(new_message)
+        if self.memory is not None:
+            self.memory.add_message(new_message["role"], new_message["content"])
+        else:
+            self.messages.append(new_message)
 
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
@@ -289,7 +319,10 @@ class SimpleChatModel:
         # Manage history
         complete_text = "".join(full_response)
         if append:
-            self.messages.append({"role": "assistant", "content": complete_text})
+            if self.memory is not None:
+                self.memory.add_message("assistant", complete_text)
+            else:
+                self.messages.append({"role": "assistant", "content": complete_text})
         else:
             self.reset()
 
@@ -308,7 +341,10 @@ class SimpleChatModel:
             new_message = {"role": "user", "content": message.to_content()}
         else:
             new_message = {"role": "user", "content": message}
-        self.messages.append(new_message)
+        if self.memory is not None:
+            self.memory.add_message(new_message["role"], new_message["content"])
+        else:
+            self.messages.append(new_message)
 
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
@@ -365,14 +401,22 @@ class SimpleChatModel:
                 for tc in choice.message.tool_calls
             ]
             if append:
-                self.messages.append({"role": "assistant", "content": None, "tool_calls": choice.message.tool_calls})
+                assistant_msg = {"role": "assistant", "content": None, "tool_calls": choice.message.tool_calls}
+                if self.memory is not None:
+                    self.memory.add_message("assistant", None)
+                    self.memory._messages[-1]["tool_calls"] = choice.message.tool_calls
+                else:
+                    self.messages.append(assistant_msg)
             else:
                 self.reset()
             return tool_results
 
         text_result = choice.message.content
         if append:
-            self.messages.append({"role": "assistant", "content": text_result})
+            if self.memory is not None:
+                self.memory.add_message("assistant", text_result)
+            else:
+                self.messages.append({"role": "assistant", "content": text_result})
         else:
             self.reset()
 
@@ -396,7 +440,10 @@ class SimpleChatModel:
             new_message = {"role": "user", "content": message.to_content()}
         else:
             new_message = {"role": "user", "content": message}
-        self.messages.append(new_message)
+        if self.memory is not None:
+            self.memory.add_message(new_message["role"], new_message["content"])
+        else:
+            self.messages.append(new_message)
 
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
@@ -416,7 +463,10 @@ class SimpleChatModel:
 
         complete_text = "".join(full_response)
         if append:
-            self.messages.append({"role": "assistant", "content": complete_text})
+            if self.memory is not None:
+                self.memory.add_message("assistant", complete_text)
+            else:
+                self.messages.append({"role": "assistant", "content": complete_text})
         else:
             self.reset()
 
