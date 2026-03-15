@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -7,6 +8,7 @@ from .tool import Tool
 
 if TYPE_CHECKING:
     from ..memory.conversation import ConversationMemory
+    from ..utils.callbacks import CallbackManager
 
 LOGGER = logging.getLogger("Nerif")
 
@@ -35,6 +37,8 @@ class NerifAgent:
         max_tokens: int | None = None,
         max_iterations: int = 10,
         memory: Optional["ConversationMemory"] = None,
+        fallback: Optional[List[str]] = None,
+        callbacks: Optional["CallbackManager"] = None,
     ):
         self.model = SimpleChatModel(
             model=model,
@@ -42,9 +46,12 @@ class NerifAgent:
             temperature=temperature,
             max_tokens=max_tokens,
             memory=memory,
+            fallback=fallback,
+            callbacks=callbacks,
         )
         self.tools: Dict[str, Tool] = {}
         self.max_iterations = max_iterations
+        self.callbacks = callbacks
 
     def register_tool(self, tool: Tool) -> None:
         self.tools[tool.name] = tool
@@ -68,6 +75,25 @@ class NerifAgent:
 
         try:
             result = tool.execute(**args)
+            if isinstance(result, str):
+                return result
+            return json.dumps(result, default=str)
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    async def _execute_tool_call_async(self, tool_call: ToolCallResult) -> str:
+        """Like _execute_tool_call but awaits async tools."""
+        tool = self.tools.get(tool_call.name)
+        if tool is None:
+            return json.dumps({"error": f"Tool '{tool_call.name}' not found"})
+
+        try:
+            args = json.loads(tool_call.arguments)
+        except json.JSONDecodeError:
+            return json.dumps({"error": f"Invalid JSON arguments: {tool_call.arguments}"})
+
+        try:
+            result = await tool.aexecute(**args)
             if isinstance(result, str):
                 return result
             return json.dumps(result, default=str)
@@ -117,6 +143,55 @@ class NerifAgent:
             # Send tool results back to model
             result = self.model.chat(
                 "",  # empty message - the tool results are already in history
+                append=True,
+                tools=tool_dicts,
+                tool_choice="auto" if tool_dicts else None,
+            )
+
+        LOGGER.warning("Agent reached max_iterations (%d) without producing a final response", self.max_iterations)
+        if isinstance(result, str):
+            return result
+        return "Agent reached maximum iterations without a final response."
+
+    async def arun(self, message: str) -> str:
+        """Async version of run(). Uses achat() and aexecute().
+
+        When multiple tool calls are returned in a single response,
+        they are executed concurrently via asyncio.gather().
+        """
+        tool_dicts = self._get_tool_dicts() if self.tools else None
+
+        result = await self.model.achat(
+            message,
+            append=True,
+            tools=tool_dicts,
+            tool_choice="auto" if tool_dicts else None,
+        )
+
+        for _ in range(self.max_iterations):
+            if isinstance(result, str):
+                return result
+
+            if not isinstance(result, list):
+                return str(result)
+
+            # Execute tool calls — concurrently if multiple
+            if len(result) > 1:
+                tool_results = await asyncio.gather(
+                    *[self._execute_tool_call_async(tc) for tc in result]
+                )
+                for tool_call, tool_result in zip(result, tool_results):
+                    self.model.messages.append(
+                        {"role": "tool", "tool_call_id": tool_call.id, "content": tool_result}
+                    )
+            else:
+                tool_result = await self._execute_tool_call_async(result[0])
+                self.model.messages.append(
+                    {"role": "tool", "tool_call_id": result[0].id, "content": tool_result}
+                )
+
+            result = await self.model.achat(
+                "",
                 append=True,
                 tools=tool_dicts,
                 tool_choice="auto" if tool_dicts else None,

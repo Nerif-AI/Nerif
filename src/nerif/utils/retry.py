@@ -6,6 +6,17 @@ from typing import Optional, Set
 import httpx
 
 
+def _is_transient_error(exception: Exception, status_codes, on_timeout: bool) -> bool:
+    """Check if an exception represents a transient error worth retrying/falling back from."""
+    if isinstance(exception, httpx.TimeoutException):
+        return on_timeout
+    if isinstance(exception, httpx.HTTPStatusError):
+        return exception.response.status_code in status_codes
+    if isinstance(exception, (httpx.ConnectError, httpx.RemoteProtocolError)):
+        return True
+    return False
+
+
 @dataclass
 class RetryConfig:
     """Configurable retry strategy with exponential backoff."""
@@ -30,14 +41,7 @@ class RetryConfig:
     def should_retry(self, attempt: int, exception: Exception) -> bool:
         if attempt >= self.max_retries:
             return False
-        if isinstance(exception, httpx.TimeoutException):
-            return self.retry_on_timeout
-        if isinstance(exception, httpx.HTTPStatusError):
-            status = exception.response.status_code
-            return status in self.retryable_status_codes
-        if isinstance(exception, (httpx.ConnectError, httpx.RemoteProtocolError)):
-            return True
-        return False
+        return _is_transient_error(exception, self.retryable_status_codes, self.retry_on_timeout)
 
 
 NO_RETRY = RetryConfig(max_retries=0)

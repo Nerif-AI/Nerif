@@ -18,7 +18,7 @@ Our goal is to make LLMs easier to use for developers, turning complex AI capabi
 
 ### Pre-requisite
 
-- Python >= 3.9
+- Python >= 3.10
 - Environment variable `OPENAI_API_KEY` or other LLM API keys, for more details, see [here](https://nerif-ai.com/docs/nerif-environment)
 - Set default model and embedding model with `NERIF_DEFAULT_LLM_MODEL` and `NERIF_DEFAULT_EMBEDDING_MODEL`, for more details, see [here](https://nerif-ai.com/docs/nerif-environment)
 
