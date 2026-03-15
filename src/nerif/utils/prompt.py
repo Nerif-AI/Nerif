@@ -1,7 +1,7 @@
 """Lightweight prompt template with variable substitution."""
 
 import re
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 class PromptTemplate:
@@ -13,25 +13,61 @@ class PromptTemplate:
     Defaults:
         PromptTemplate("In {lang}", defaults={"lang": "English"}).format()  # "In English"
 
-    Conditional sections — gated on a single trigger variable:
+    Conditional sections — gated on the first variable found inside:
         PromptTemplate("Do X.{? format: {fmt}}").format()            # "Do X."
         PromptTemplate("Do X.{? format: {fmt}}").format(fmt="JSON")  # "Do X. format: JSON"
+
+    Conditional sections can contain multiple variables:
+        PromptTemplate("{? {a} and {b}}").format(a="X", b="Y")  # " X and Y"
+        PromptTemplate("{? {a} and {b}}").format()               # "" (a is trigger, absent)
 
     Inside conditional sections, variables use silent substitution (empty string
     if missing). Top-level variables raise KeyError if missing.
     """
 
     _VAR_PATTERN = re.compile(r"\{(\w+)\}")
-    _CONDITIONAL_PATTERN = re.compile(r"\{\?([^}]*\{(\w+)\}[^}]*)\}")
 
     def __init__(self, template: str, defaults: Optional[Dict[str, Any]] = None):
         self.template = template
         self.defaults = defaults or {}
 
+    @staticmethod
+    def _find_conditionals(template: str) -> List[Tuple[int, int, str]]:
+        """Find all {? ... } sections, handling nested {var} braces.
+
+        Returns list of (start, end, inner_content) tuples.
+        """
+        results = []
+        i = 0
+        while i < len(template) - 1:
+            if template[i : i + 2] == "{?":
+                # Find the matching closing brace, accounting for nested {var}
+                depth = 1
+                start = i
+                j = i + 2
+                while j < len(template) and depth > 0:
+                    if template[j] == "{":
+                        depth += 1
+                    elif template[j] == "}":
+                        depth -= 1
+                    j += 1
+                if depth == 0:
+                    # inner content is between {? and the final }
+                    inner = template[start + 2 : j - 1]
+                    results.append((start, j, inner))
+                    i = j
+                    continue
+            i += 1
+        return results
+
     @property
     def variables(self) -> Set[str]:
-        """Return all variable names in the template (including inside conditionals)."""
-        return set(self._VAR_PATTERN.findall(self.template))
+        """Return all variable names in the template (excluding conditional markers)."""
+        # Strip conditional markers, keep inner content
+        cleaned = self.template
+        for start, end, inner in reversed(self._find_conditionals(self.template)):
+            cleaned = cleaned[:start] + inner + cleaned[end:]
+        return set(self._VAR_PATTERN.findall(cleaned))
 
     def format(self, **kwargs) -> str:
         """Render the template with the given variables.
@@ -41,15 +77,24 @@ class PromptTemplate:
         """
         merged = {**self.defaults, **kwargs}
 
-        def replace_conditional(match):
-            section = match.group(1)
-            var_name = match.group(2)
-            if var_name in merged and merged[var_name] is not None:
-                return self._VAR_PATTERN.sub(lambda m: str(merged.get(m.group(1), "")), section)
-            return ""
+        # Process conditional sections (in reverse to preserve indices)
+        result = self.template
+        for start, end, inner in reversed(self._find_conditionals(result)):
+            var_names = self._VAR_PATTERN.findall(inner)
+            if not var_names:
+                # No variables in conditional — include as-is
+                result = result[:start] + inner + result[end:]
+                continue
+            trigger = var_names[0]
+            if trigger in merged and merged[trigger] is not None:
+                # Render section; all variables use silent substitution
+                rendered = self._VAR_PATTERN.sub(lambda m: str(merged.get(m.group(1), "")), inner)
+                result = result[:start] + rendered + result[end:]
+            else:
+                # Remove entire conditional section
+                result = result[:start] + result[end:]
 
-        result = self._CONDITIONAL_PATTERN.sub(replace_conditional, self.template)
-
+        # Substitute remaining top-level variables (strict — raises KeyError)
         def replace_var(match):
             name = match.group(1)
             if name not in merged:

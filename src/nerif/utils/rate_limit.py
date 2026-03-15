@@ -47,7 +47,8 @@ class RateLimiter:
         self._async_semaphore: Optional[asyncio.Semaphore] = None
         if config.max_concurrent > 0:
             self._semaphore = threading.Semaphore(config.max_concurrent)
-            self._async_semaphore = asyncio.Semaphore(config.max_concurrent)
+            # async semaphore created lazily in aacquire() to avoid
+            # binding to a specific event loop at init time
 
     def acquire(self) -> None:
         """Block until we can make a request (sync)."""
@@ -73,7 +74,9 @@ class RateLimiter:
 
         Uses asyncio.Lock to avoid holding a threading lock across await.
         """
-        if self._async_semaphore is not None:
+        if self.config.max_concurrent > 0:
+            if self._async_semaphore is None:
+                self._async_semaphore = asyncio.Semaphore(self.config.max_concurrent)
             await self._async_semaphore.acquire()
 
         interval = self.config.min_interval
