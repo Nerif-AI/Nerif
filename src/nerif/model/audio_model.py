@@ -212,11 +212,11 @@ class SpeechModel:
             "Content-Type": "application/json",
         }
         body = {
-            "model": model or self.model,
+            "model": model if model is not None else self.model,
             "input": text,
-            "voice": voice or self.voice,
-            "response_format": response_format or self.response_format,
-            "speed": speed or self.speed,
+            "voice": voice if voice is not None else self.voice,
+            "response_format": response_format if response_format is not None else self.response_format,
+            "speed": speed if speed is not None else self.speed,
         }
         resp = httpx.post(url, json=body, headers=headers, timeout=_DEFAULT_TIMEOUT)
         resp.raise_for_status()
@@ -237,11 +237,11 @@ class SpeechModel:
             "Content-Type": "application/json",
         }
         body = {
-            "model": model or self.model,
+            "model": model if model is not None else self.model,
             "input": text,
-            "voice": voice or self.voice,
-            "response_format": response_format or self.response_format,
-            "speed": speed or self.speed,
+            "voice": voice if voice is not None else self.voice,
+            "response_format": response_format if response_format is not None else self.response_format,
+            "speed": speed if speed is not None else self.speed,
         }
         async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT) as client:
             resp = await client.post(url, json=body, headers=headers)
