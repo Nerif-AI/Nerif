@@ -3,16 +3,6 @@ import re
 
 from nerif.exceptions import FormatError
 
-try:
-    from pydantic import BaseModel as PydanticBaseModel
-    from pydantic import ValidationError as PydanticValidationError
-
-    HAS_PYDANTIC = True
-except ImportError:
-    HAS_PYDANTIC = False
-    PydanticBaseModel = None
-    PydanticValidationError = None
-
 
 class FormatVerifierBase:
     cls = object
@@ -220,10 +210,6 @@ class FormatVerifierPydantic(FormatVerifierBase):
     simple = False
 
     def __init__(self, pydantic_model):
-        if not HAS_PYDANTIC:
-            raise ImportError(
-                "pydantic is required for FormatVerifierPydantic. Install it with: pip install nerif[pydantic]"
-            )
         self.pydantic_model = pydantic_model
         self.cls = pydantic_model
 
