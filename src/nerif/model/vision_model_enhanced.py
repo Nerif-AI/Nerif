@@ -3,7 +3,7 @@ import io
 from pathlib import Path
 from typing import Any, List, Optional, Union
 
-import requests
+import httpx
 from PIL import Image
 
 from ..utils import (
@@ -121,7 +121,7 @@ class VisionModelWithCompression:
     def _download_image_from_url(self, url: str) -> bytes:
         """Download image from URL."""
         try:
-            response = requests.get(url, timeout=30)
+            response = httpx.get(url, timeout=30)
             response.raise_for_status()
             return response.content
         except Exception as e:
