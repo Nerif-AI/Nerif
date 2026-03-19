@@ -1,7 +1,7 @@
 import json
 import re
 
-from nerif.exceptions import FormatError
+from ..exceptions import FormatError
 
 
 class FormatVerifierBase:
