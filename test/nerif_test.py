@@ -1,8 +1,12 @@
+import os
 import unittest
 
 from nerif.core import nerif, nerif_match_string
 
+_RUN_LIVE = bool(os.environ.get("NERIF_RUN_LIVE_TESTS"))
 
+
+@unittest.skipUnless(_RUN_LIVE, "NERIF_RUN_LIVE_TESTS not set — skipping live API tests")
 class MyTestCase(unittest.TestCase):
     def test_judge(self):
         judge = nerif("the sky is blue")
