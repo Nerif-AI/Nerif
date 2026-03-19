@@ -132,7 +132,7 @@ class FormatVerifierStringList(FormatVerifierBase):
             return True
         return False
 
-    def match(self, val: str) -> list[int]:
+    def match(self, val: str) -> list[str]:
         candidate = self.pattern.findall(val)
         if len(candidate) > 0:
             return self.convert(candidate[0])
@@ -163,12 +163,20 @@ class FormatVerifierStringList(FormatVerifierBase):
             return candidate
         return None
 
-    def convert(self, val: str) -> list[int]:
+    def convert(self, val: str) -> list[str]:
+        import ast
+
         try:
-            res = eval(val.strip())
-        except Exception as e:
-            print("Cannot convet because error {}".format(e))
-        return res
+            result = ast.literal_eval(val.strip())
+            if isinstance(result, list):
+                return result
+            raise ValueError(f"Expected list, got {type(result).__name__}")
+        except (ValueError, SyntaxError) as e:
+            raise FormatError(
+                f"Cannot convert to list: {e}",
+                raw_output=val,
+                expected_type=list,
+            )
 
 
 class FormatVerifierJson(FormatVerifierBase):
