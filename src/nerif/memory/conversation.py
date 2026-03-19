@@ -219,7 +219,14 @@ class ConversationMemory:
     def save(self, path: str) -> None:
         """Serialize conversation state to a JSON file."""
         data = {
-            "version": "1.0",
+            "version": "1.1",
+            "config": {
+                "max_messages": self.max_messages,
+                "max_tokens": self.max_tokens,
+                "summarize": self.summarize,
+                "summarize_model": self.summarize_model,
+                "summary_prompt": self.summary_prompt if self.summary_prompt != DEFAULT_SUMMARY_PROMPT else None,
+            },
             "metadata": self._metadata,
             "summary": self._summary,
             "messages": self._messages,
@@ -233,7 +240,14 @@ class ConversationMemory:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        instance = cls()
+        config = data.get("config", {})
+        instance = cls(
+            max_messages=config.get("max_messages"),
+            max_tokens=config.get("max_tokens"),
+            summarize=config.get("summarize", False),
+            summarize_model=config.get("summarize_model", "gpt-4o-mini"),
+            summary_prompt=config.get("summary_prompt"),
+        )
         instance._summary = data.get("summary")
         instance._messages = data.get("messages", [])
         instance._metadata = data.get("metadata", {})
