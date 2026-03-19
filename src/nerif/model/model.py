@@ -1,4 +1,5 @@
 import base64
+import time as _time
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Dict, Generator, List, Optional, Union
 
@@ -16,7 +17,7 @@ from ..utils import (
     get_model_response_stream_async,
     get_response,
 )
-from ..utils.callbacks import CallbackManager
+from ..utils.callbacks import CallbackManager, LLMEndEvent, LLMErrorEvent, LLMStartEvent
 from ..utils.fallback import FallbackConfig
 from ..utils.rate_limit import RateLimiter
 from ..utils.retry import RetryConfig
@@ -126,7 +127,7 @@ class SimpleChatModel:
         model: str = NERIF_DEFAULT_LLM_MODEL,
         default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
         temperature: float = 0.0,
-        counter: NerifTokenCounter = None,
+        counter: Optional[NerifTokenCounter] = None,
         max_tokens: None | int = None,
         retry_config: Optional[RetryConfig] = None,
         memory: Optional[Any] = None,
@@ -202,32 +203,8 @@ class SimpleChatModel:
                 LOGGER.warning("Model %s failed, trying next fallback: %s", model_name, e)
         raise last_exception
 
-    def chat(
-        self,
-        message: Union[str, MultiModalMessage],
-        append: bool = False,
-        max_tokens: None | int = None,
-        tools: Optional[List[Union[Dict[str, Any], ToolDefinition]]] = None,
-        tool_choice: Optional[Any] = None,
-        response_format: Optional[Any] = None,
-        response_model: Optional[Any] = None,
-    ) -> Union[str, List[ToolCallResult]]:
-        """
-        Send a message and get a response.
-
-        Args:
-            message: Text string or MultiModalMessage for multi-modal input.
-            append: If True, keep conversation history; if False, reset after response.
-            max_tokens: Override max tokens for this request.
-            tools: List of tool definitions for function calling.
-            tool_choice: Tool choice parameter (e.g. "auto", "none", or specific tool).
-            response_format: Response format (e.g. {"type": "json_object"}).
-            response_model: Pydantic model class for structured output parsing.
-
-        Returns:
-            Text response string, Pydantic model instance if response_model is set,
-            or list of ToolCallResult if tools were called.
-        """
+    def _prepare_chat_kwargs(self, message, max_tokens, tools, tool_choice, response_format, response_model):
+        """Build message and kwargs for chat/achat. Appends user message to history."""
         if isinstance(message, MultiModalMessage):
             new_message = {"role": "user", "content": message.to_content()}
         else:
@@ -239,33 +216,18 @@ class SimpleChatModel:
 
         req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
 
-        # Normalize tool definitions
         tool_dicts = None
         if tools is not None:
-            tool_dicts = []
-            for t in tools:
-                if isinstance(t, ToolDefinition):
-                    tool_dicts.append(t.to_dict())
-                else:
-                    tool_dicts.append(t)
+            tool_dicts = [t.to_dict() if isinstance(t, ToolDefinition) else t for t in tools]
 
-        # When response_model is set, generate JSON schema and set response_format
         if response_model is not None:
             schema = response_model.model_json_schema()
             response_format = {
                 "type": "json_schema",
-                "json_schema": {
-                    "name": response_model.__name__,
-                    "schema": schema,
-                },
+                "json_schema": {"name": response_model.__name__, "schema": schema},
             }
 
-        kwargs = {
-            "model": self.model,
-            "temperature": self.temperature,
-            "max_tokens": req_max_tokens,
-        }
-
+        kwargs = {"model": self.model, "temperature": self.temperature, "max_tokens": req_max_tokens}
         if self.counter is not None:
             kwargs["counter"] = self.counter
         if tool_dicts is not None:
@@ -276,32 +238,25 @@ class SimpleChatModel:
             kwargs["response_format"] = response_format
         if self.retry_config is not None:
             kwargs["retry_config"] = self.retry_config
+        return kwargs
 
-        LOGGER.debug("requested with message: %s", self.messages)
-        LOGGER.debug("arguments of request: %s", kwargs)
-
-        result = self._call_with_fallback(lambda **kw: get_model_response(self.messages, **kw), kwargs)
-
+    def _process_chat_result(self, result, append, response_model=None):
+        """Process API result: handle tool calls, history, response_model parsing."""
         choice = result.choices[0]
 
-        # Check if the model returned tool calls
         if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
             tool_results = [
-                ToolCallResult(
-                    id=tc.id,
-                    name=tc.function.name,
-                    arguments=tc.function.arguments,
-                )
+                ToolCallResult(id=tc.id, name=tc.function.name, arguments=tc.function.arguments)
                 for tc in choice.message.tool_calls
             ]
             if append:
-                assistant_msg = {"role": "assistant", "content": None, "tool_calls": choice.message.tool_calls}
                 if self.memory is not None:
                     self.memory.add_message("assistant", None)
-                    # Patch the last appended message to include tool_calls
                     self.memory._messages[-1]["tool_calls"] = choice.message.tool_calls
                 else:
-                    self.messages.append(assistant_msg)
+                    self.messages.append(
+                        {"role": "assistant", "content": None, "tool_calls": choice.message.tool_calls}
+                    )
             else:
                 self.reset()
             return tool_results
@@ -322,6 +277,72 @@ class SimpleChatModel:
             return verifier(text_result)
 
         return text_result
+
+    def chat(
+        self,
+        message: Union[str, MultiModalMessage],
+        append: bool = False,
+        max_tokens: None | int = None,
+        tools: Optional[List[Union[Dict[str, Any], ToolDefinition]]] = None,
+        tool_choice: Optional[Any] = None,
+        response_format: Optional[Any] = None,
+        response_model: Optional[Any] = None,
+    ) -> Union[str, List[ToolCallResult]]:
+        """Send a message and get a response."""
+        kwargs = self._prepare_chat_kwargs(message, max_tokens, tools, tool_choice, response_format, response_model)
+
+        LOGGER.debug("requested with message: %s", self.messages)
+        LOGGER.debug("arguments of request: %s", kwargs)
+
+        llm_start_time = _time.time()
+        if self.callbacks:
+            self.callbacks.fire(
+                "on_llm_start",
+                LLMStartEvent(
+                    model=kwargs["model"],
+                    messages=list(self.messages),
+                    timestamp=llm_start_time,
+                    kwargs=kwargs,
+                ),
+            )
+
+        if self.rate_limiter is not None:
+            self.rate_limiter.acquire()
+
+        try:
+            result = self._call_with_fallback(lambda **kw: get_model_response(self.messages, **kw), kwargs)
+        except Exception as e:
+            if self.rate_limiter is not None:
+                self.rate_limiter.release()
+            if self.callbacks:
+                self.callbacks.fire(
+                    "on_llm_error",
+                    LLMErrorEvent(
+                        model=kwargs["model"],
+                        error=e,
+                        latency_ms=(_time.time() - llm_start_time) * 1000,
+                        will_retry=False,
+                    ),
+                )
+            raise
+
+        if self.rate_limiter is not None:
+            self.rate_limiter.release()
+
+        if self.callbacks:
+            self.callbacks.fire(
+                "on_llm_end",
+                LLMEndEvent(
+                    model=kwargs["model"],
+                    response=str(result.choices[0].message.content or "")[:200],
+                    latency_ms=(_time.time() - llm_start_time) * 1000,
+                    prompt_tokens=getattr(getattr(result, "usage", None), "prompt_tokens", 0) or 0,
+                    completion_tokens=getattr(getattr(result, "usage", None), "completion_tokens", 0) or 0,
+                    cost_usd=0.0,
+                ),
+            )
+
+        return self._process_chat_result(result, append, response_model)
 
     def stream_chat(
         self,
@@ -384,98 +405,172 @@ class SimpleChatModel:
         response_model: Optional[Any] = None,
     ) -> Union[str, List["ToolCallResult"]]:
         """Async version of chat()."""
-        if isinstance(message, MultiModalMessage):
-            new_message = {"role": "user", "content": message.to_content()}
-        else:
-            new_message = {"role": "user", "content": message}
-        if self.memory is not None:
-            self.memory.add_message(new_message["role"], new_message["content"])
-        else:
-            self.messages.append(new_message)
-
-        req_max_tokens = self.agent_max_tokens if max_tokens is None else max_tokens
-
-        tool_dicts = None
-        if tools is not None:
-            tool_dicts = []
-            for t in tools:
-                if isinstance(t, ToolDefinition):
-                    tool_dicts.append(t.to_dict())
-                else:
-                    tool_dicts.append(t)
-
-        if response_model is not None:
-            schema = response_model.model_json_schema()
-            response_format = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": response_model.__name__,
-                    "schema": schema,
-                },
-            }
-
-        kwargs = {
-            "model": self.model,
-            "temperature": self.temperature,
-            "max_tokens": req_max_tokens,
-        }
-
-        if self.counter is not None:
-            kwargs["counter"] = self.counter
-        if tool_dicts is not None:
-            kwargs["tools"] = tool_dicts
-        if tool_choice is not None:
-            kwargs["tool_choice"] = tool_choice
-        if response_format is not None:
-            kwargs["response_format"] = response_format
-        if self.retry_config is not None:
-            kwargs["retry_config"] = self.retry_config
+        kwargs = self._prepare_chat_kwargs(message, max_tokens, tools, tool_choice, response_format, response_model)
 
         LOGGER.debug("requested with message: %s", self.messages)
         LOGGER.debug("arguments of request: %s", kwargs)
 
-        result = await self._call_with_fallback_async(
-            lambda **kw: get_model_response_async(self.messages, **kw), kwargs
-        )
+        llm_start_time = _time.time()
+        if self.callbacks:
+            self.callbacks.fire(
+                "on_llm_start",
+                LLMStartEvent(
+                    model=kwargs["model"],
+                    messages=list(self.messages),
+                    timestamp=llm_start_time,
+                    kwargs=kwargs,
+                ),
+            )
 
-        choice = result.choices[0]
+        if self.rate_limiter is not None:
+            await self.rate_limiter.aacquire()
 
-        if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
-            tool_results = [
-                ToolCallResult(
-                    id=tc.id,
-                    name=tc.function.name,
-                    arguments=tc.function.arguments,
+        try:
+            result = await self._call_with_fallback_async(
+                lambda **kw: get_model_response_async(self.messages, **kw), kwargs
+            )
+        except Exception as e:
+            if self.rate_limiter is not None:
+                self.rate_limiter.arelease()
+            if self.callbacks:
+                self.callbacks.fire(
+                    "on_llm_error",
+                    LLMErrorEvent(
+                        model=kwargs["model"],
+                        error=e,
+                        latency_ms=(_time.time() - llm_start_time) * 1000,
+                        will_retry=False,
+                    ),
                 )
-                for tc in choice.message.tool_calls
-            ]
-            if append:
-                assistant_msg = {"role": "assistant", "content": None, "tool_calls": choice.message.tool_calls}
-                if self.memory is not None:
-                    self.memory.add_message("assistant", None)
-                    self.memory._messages[-1]["tool_calls"] = choice.message.tool_calls
-                else:
-                    self.messages.append(assistant_msg)
-            else:
-                self.reset()
-            return tool_results
+            raise
 
-        text_result = choice.message.content
-        if append:
-            if self.memory is not None:
-                self.memory.add_message("assistant", text_result)
-            else:
-                self.messages.append({"role": "assistant", "content": text_result})
-        else:
-            self.reset()
+        if self.rate_limiter is not None:
+            self.rate_limiter.arelease()
 
-        if response_model is not None:
-            from ..utils.format import FormatVerifierPydantic
+        if self.callbacks:
+            self.callbacks.fire(
+                "on_llm_end",
+                LLMEndEvent(
+                    model=kwargs["model"],
+                    response=str(result.choices[0].message.content or "")[:200],
+                    latency_ms=(_time.time() - llm_start_time) * 1000,
+                    prompt_tokens=getattr(getattr(result, "usage", None), "prompt_tokens", 0) or 0,
+                    completion_tokens=getattr(getattr(result, "usage", None), "completion_tokens", 0) or 0,
+                    cost_usd=0.0,
+                ),
+            )
 
-            verifier = FormatVerifierPydantic(response_model)
-            return verifier(text_result)
+        return self._process_chat_result(result, append, response_model)
 
-        return text_result
+    def _continue_after_tools(self, tools=None, tool_choice=None):
+        """Continue conversation after tool results without appending a user message.
+
+        Used by NerifAgent when tool results are already in self.messages.
+        Preserves fallback, callback, and rate-limiter behavior.
+        """
+        kwargs = {"model": self.model, "temperature": self.temperature,
+                  "max_tokens": self.agent_max_tokens}
+        if self.counter is not None:
+            kwargs["counter"] = self.counter
+        if tools is not None:
+            kwargs["tools"] = tools
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
+        if self.retry_config is not None:
+            kwargs["retry_config"] = self.retry_config
+
+        llm_start_time = _time.time()
+        if self.callbacks:
+            self.callbacks.fire("on_llm_start", LLMStartEvent(
+                model=kwargs["model"], messages=list(self.messages),
+                timestamp=llm_start_time, kwargs=kwargs,
+            ))
+
+        if self.rate_limiter is not None:
+            self.rate_limiter.acquire()
+
+        try:
+            result = self._call_with_fallback(
+                lambda **kw: get_model_response(self.messages, **kw), kwargs
+            )
+        except Exception as e:
+            if self.rate_limiter is not None:
+                self.rate_limiter.release()
+            if self.callbacks:
+                self.callbacks.fire("on_llm_error", LLMErrorEvent(
+                    model=kwargs["model"], error=e,
+                    latency_ms=(_time.time() - llm_start_time) * 1000,
+                    will_retry=False,
+                ))
+            raise
+
+        if self.rate_limiter is not None:
+            self.rate_limiter.release()
+
+        if self.callbacks:
+            self.callbacks.fire("on_llm_end", LLMEndEvent(
+                model=kwargs["model"],
+                response=str(result.choices[0].message.content or "")[:200],
+                latency_ms=(_time.time() - llm_start_time) * 1000,
+                prompt_tokens=getattr(getattr(result, "usage", None), "prompt_tokens", 0) or 0,
+                completion_tokens=getattr(getattr(result, "usage", None), "completion_tokens", 0) or 0,
+                cost_usd=0.0,
+            ))
+
+        return self._process_chat_result(result, append=True)
+
+    async def _acontinue_after_tools(self, tools=None, tool_choice=None):
+        """Async version of _continue_after_tools."""
+        kwargs = {"model": self.model, "temperature": self.temperature,
+                  "max_tokens": self.agent_max_tokens}
+        if self.counter is not None:
+            kwargs["counter"] = self.counter
+        if tools is not None:
+            kwargs["tools"] = tools
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
+        if self.retry_config is not None:
+            kwargs["retry_config"] = self.retry_config
+
+        llm_start_time = _time.time()
+        if self.callbacks:
+            self.callbacks.fire("on_llm_start", LLMStartEvent(
+                model=kwargs["model"], messages=list(self.messages),
+                timestamp=llm_start_time, kwargs=kwargs,
+            ))
+
+        if self.rate_limiter is not None:
+            await self.rate_limiter.aacquire()
+
+        try:
+            result = await self._call_with_fallback_async(
+                lambda **kw: get_model_response_async(self.messages, **kw), kwargs
+            )
+        except Exception as e:
+            if self.rate_limiter is not None:
+                self.rate_limiter.arelease()
+            if self.callbacks:
+                self.callbacks.fire("on_llm_error", LLMErrorEvent(
+                    model=kwargs["model"], error=e,
+                    latency_ms=(_time.time() - llm_start_time) * 1000,
+                    will_retry=False,
+                ))
+            raise
+
+        if self.rate_limiter is not None:
+            self.rate_limiter.arelease()
+
+        if self.callbacks:
+            self.callbacks.fire("on_llm_end", LLMEndEvent(
+                model=kwargs["model"],
+                response=str(result.choices[0].message.content or "")[:200],
+                latency_ms=(_time.time() - llm_start_time) * 1000,
+                prompt_tokens=getattr(getattr(result, "usage", None), "prompt_tokens", 0) or 0,
+                completion_tokens=getattr(getattr(result, "usage", None), "completion_tokens", 0) or 0,
+                cost_usd=0.0,
+            ))
+
+        return self._process_chat_result(result, append=True)
 
     async def astream_chat(
         self,

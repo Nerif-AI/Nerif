@@ -14,7 +14,7 @@ class TestImageCompressor(unittest.TestCase):
     def setUp(self):
         """Set up test environment."""
         self.temp_dir = Path(tempfile.mkdtemp())
-        self.compressor = ImageCompressor(size_threshold_mb=0.01)  # 10KB for testing
+        self.compressor = ImageCompressor(size_threshold_mb=0.001)  # 1KB for testing
 
     def tearDown(self):
         """Clean up test environment."""
@@ -126,7 +126,7 @@ class TestImageCompressor(unittest.TestCase):
 
         # Use a compressor that favors JPEG conversion
         compressor = ImageCompressor(
-            size_threshold_mb=0.01,
+            size_threshold_mb=0.001,
             convert_to_jpeg_threshold=0.9,  # Very aggressive conversion
         )
 
@@ -182,8 +182,8 @@ class TestImageCompressor(unittest.TestCase):
         # Create output directory
         output_dir = self.temp_dir / "compressed"
 
-        # Compress batch
-        self.compressor.compress_batch(image_paths, output_dir)
+        # Compress batch (preserve_structure=False so files land directly in output_dir)
+        self.compressor.compress_batch(image_paths, output_dir, preserve_structure=False)
 
         # Verify output files exist
         self.assertTrue(output_dir.exists())

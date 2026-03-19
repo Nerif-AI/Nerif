@@ -147,7 +147,7 @@ class TestVisionModelWithCompression(unittest.TestCase):
         self.assertTrue(processed_url.startswith("data:image/"))
         self.assertIn("base64,", processed_url)
 
-    @patch("requests.get")
+    @patch("httpx.get")
     def test_process_image_url(self, mock_get):
         """Test processing image from URL."""
         # Mock HTTP response

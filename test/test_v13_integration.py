@@ -254,7 +254,7 @@ class TestFallbackAsync:
                 result = await model.achat("hello")
                 assert result == "async mini"
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------
@@ -272,11 +272,12 @@ class TestAsyncAgentPlusMemory:
         )
 
         async def run():
-            with patch.object(agent.model, "achat", new_callable=AsyncMock) as mock:
-                mock.side_effect = [
-                    [ToolCallResult(id="c1", name="greet", arguments='{"name": "Alice"}')],
-                    "Greeting sent!",
-                ]
+            with (
+                patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat,
+                patch.object(agent.model, "_acontinue_after_tools", new_callable=AsyncMock) as mock_continue,
+            ):
+                mock_achat.return_value = [ToolCallResult(id="c1", name="greet", arguments='{"name": "Alice"}')]
+                mock_continue.return_value = "Greeting sent!"
                 result = await agent.arun("Greet Alice")
                 assert result == "Greeting sent!"
 
@@ -287,7 +288,7 @@ class TestAsyncAgentPlusMemory:
             assert len(tool_msgs) == 1
             assert "Hello Alice" in tool_msgs[0]["content"]
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
 
 class TestAsyncAgentPlusFallback:
@@ -553,11 +554,12 @@ class TestAllFeaturesCombined:
         )
 
         async def run():
-            with patch.object(agent.model, "achat", new_callable=AsyncMock) as mock:
-                mock.side_effect = [
-                    [ToolCallResult(id="c1", name="compute", arguments='{"expr": "2+2"}')],
-                    "The answer is 4.",
-                ]
+            with (
+                patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat,
+                patch.object(agent.model, "_acontinue_after_tools", new_callable=AsyncMock) as mock_continue,
+            ):
+                mock_achat.return_value = [ToolCallResult(id="c1", name="compute", arguments='{"expr": "2+2"}')]
+                mock_continue.return_value = "The answer is 4."
                 result = await agent.arun("What is 2+2?")
                 assert result == "The answer is 4."
 
@@ -570,7 +572,7 @@ class TestAllFeaturesCombined:
             assert len(tool_msgs) == 1
             assert "4" in tool_msgs[0]["content"]
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------

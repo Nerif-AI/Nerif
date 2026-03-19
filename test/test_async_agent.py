@@ -89,14 +89,16 @@ class TestNerifAgentAsync:
         )
 
         async def run():
-            with patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat:
-                mock_achat.side_effect = [
-                    _make_mock_tool_calls(),
-                    "It's sunny in Tokyo.",
-                ]
+            with (
+                patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat,
+                patch.object(agent.model, "_acontinue_after_tools", new_callable=AsyncMock) as mock_continue,
+            ):
+                mock_achat.return_value = _make_mock_tool_calls()
+                mock_continue.return_value = "It's sunny in Tokyo."
                 result = await agent.arun("Weather in Tokyo?")
                 assert result == "It's sunny in Tokyo."
-                assert mock_achat.call_count == 2
+                mock_achat.assert_called_once()
+                mock_continue.assert_called_once()
 
         asyncio.get_event_loop().run_until_complete(run())
 
@@ -119,11 +121,12 @@ class TestNerifAgentAsync:
         )
 
         async def run():
-            with patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat:
-                mock_achat.side_effect = [
-                    _make_mock_tool_calls(args='{"city": "London"}'),
-                    "It's rainy.",
-                ]
+            with (
+                patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat,
+                patch.object(agent.model, "_acontinue_after_tools", new_callable=AsyncMock) as mock_continue,
+            ):
+                mock_achat.return_value = _make_mock_tool_calls(args='{"city": "London"}')
+                mock_continue.return_value = "It's rainy."
                 await agent.arun("Weather in London?")
                 assert calls == ["async"]
 
@@ -134,8 +137,12 @@ class TestNerifAgentAsync:
         agent.register_tool(Tool(name="noop", description="No-op", parameters={}, func=lambda: "ok"))
 
         async def run():
-            with patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat:
+            with (
+                patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat,
+                patch.object(agent.model, "_acontinue_after_tools", new_callable=AsyncMock) as mock_continue,
+            ):
                 mock_achat.return_value = [ToolCallResult(id="c1", name="noop", arguments="{}")]
+                mock_continue.return_value = [ToolCallResult(id="c2", name="noop", arguments="{}")]
                 result = await agent.arun("Do something")
                 assert "maximum iterations" in result.lower()
 
@@ -155,14 +162,15 @@ class TestNerifAgentAsync:
         )
 
         async def run():
-            with patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat:
-                mock_achat.side_effect = [
-                    [
-                        ToolCallResult(id="c1", name="weather", arguments='{"city": "A"}'),
-                        ToolCallResult(id="c2", name="weather", arguments='{"city": "B"}'),
-                    ],
-                    "Done",
+            with (
+                patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat,
+                patch.object(agent.model, "_acontinue_after_tools", new_callable=AsyncMock) as mock_continue,
+            ):
+                mock_achat.return_value = [
+                    ToolCallResult(id="c1", name="weather", arguments='{"city": "A"}'),
+                    ToolCallResult(id="c2", name="weather", arguments='{"city": "B"}'),
                 ]
+                mock_continue.return_value = "Done"
                 result = await agent.arun("Weather in A and B")
                 assert result == "Done"
                 assert set(call_order) == {"A", "B"}
@@ -173,11 +181,12 @@ class TestNerifAgentAsync:
         agent = NerifAgent(model="gpt-4o")
 
         async def run():
-            with patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat:
-                mock_achat.side_effect = [
-                    [ToolCallResult(id="c1", name="nonexistent", arguments="{}")],
-                    "Fallback response",
-                ]
+            with (
+                patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat,
+                patch.object(agent.model, "_acontinue_after_tools", new_callable=AsyncMock) as mock_continue,
+            ):
+                mock_achat.return_value = [ToolCallResult(id="c1", name="nonexistent", arguments="{}")]
+                mock_continue.return_value = "Fallback response"
                 result = await agent.arun("Do X")
                 assert result == "Fallback response"
                 tool_msgs = [m for m in agent.model.messages if m.get("role") == "tool"]
