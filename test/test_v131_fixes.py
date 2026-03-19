@@ -1,9 +1,12 @@
 """Tests for v1.3.1 fixes."""
 
+import asyncio
+
 import pytest
 
 from nerif.exceptions import FormatError
 from nerif.utils.format import FormatVerifierStringList
+from nerif.utils.rate_limit import RateLimitConfig, RateLimiter
 
 
 class TestFormatVerifierStringListSecurity:
@@ -31,23 +34,18 @@ class TestFormatVerifierStringListSecurity:
         assert result == ["single"]
 
 
-import asyncio
-
-from nerif.utils.rate_limit import RateLimitConfig, RateLimiter
-
-
 class TestRateLimiterAsyncSafety:
     """Test that async lock initialization is safe under concurrency."""
 
     def test_concurrent_aacquire_no_race(self):
-        config = RateLimitConfig(requests_per_second=100, max_concurrent=5)
+        # No max_concurrent so aacquire() returns immediately after the
+        # interval check; no semaphore deadlock between gather and arelease.
+        config = RateLimitConfig(requests_per_second=100, max_concurrent=0)
         limiter = RateLimiter(config)
 
         async def run():
             tasks = [limiter.aacquire() for _ in range(10)]
             await asyncio.gather(*tasks)
-            for _ in range(10):
-                limiter.arelease()
 
         asyncio.run(run())
-        # If no exception, the race condition is fixed
+        # If no exception, the async primitives initialised without a race

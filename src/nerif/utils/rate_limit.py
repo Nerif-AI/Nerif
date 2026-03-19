@@ -69,20 +69,29 @@ class RateLimiter:
         if self._semaphore is not None:
             self._semaphore.release()
 
+    def _ensure_async_primitives(self) -> None:
+        """Lazily create async primitives. Must be called from async context.
+
+        Safe because asyncio is single-threaded within an event loop —
+        no two coroutines execute this simultaneously.
+        """
+        if self._async_lock is None:
+            self._async_lock = asyncio.Lock()
+        if self.config.max_concurrent > 0 and self._async_semaphore is None:
+            self._async_semaphore = asyncio.Semaphore(self.config.max_concurrent)
+
     async def aacquire(self) -> None:
         """Block until we can make a request (async).
 
         Uses asyncio.Lock to avoid holding a threading lock across await.
         """
-        if self.config.max_concurrent > 0:
-            if self._async_semaphore is None:
-                self._async_semaphore = asyncio.Semaphore(self.config.max_concurrent)
+        self._ensure_async_primitives()
+
+        if self._async_semaphore is not None:
             await self._async_semaphore.acquire()
 
         interval = self.config.min_interval
         if interval > 0:
-            if self._async_lock is None:
-                self._async_lock = asyncio.Lock()
             async with self._async_lock:
                 now = time.monotonic()
                 elapsed = now - self._last_request
