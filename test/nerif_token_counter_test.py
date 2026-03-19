@@ -1,3 +1,4 @@
+import os
 import pprint
 import unittest
 
@@ -6,6 +7,8 @@ from nerif.model import SimpleChatModel, SimpleEmbeddingModel
 from nerif.utils import NerifTokenCounter, get_embedding, get_model_response
 
 pretty_printer = pprint.PrettyPrinter()
+
+_RUN_LIVE = bool(os.environ.get("NERIF_RUN_LIVE_TESTS"))
 
 
 class TestTokenCounter(unittest.TestCase):
@@ -32,6 +35,7 @@ class TestTokenCounter(unittest.TestCase):
             0,
         )
 
+    @unittest.skipUnless(_RUN_LIVE, "NERIF_RUN_LIVE_TESTS not set — skipping live API tests")
     def test_counting_embedding_raw(self):
         counter = NerifTokenCounter()
         response = get_embedding(model="text-embedding-3-small", messages="Hello")
@@ -41,6 +45,7 @@ class TestTokenCounter(unittest.TestCase):
         self.assertEqual(counter.model_token["text-embedding-3-small"].request, 0)
         self.assertGreater(counter.model_token["text-embedding-3-small"].response, 0)
 
+    @unittest.skipUnless(_RUN_LIVE, "NERIF_RUN_LIVE_TESTS not set — skipping live API tests")
     def test_counting_mixed_raw(self):
         counter = NerifTokenCounter()
         response = get_model_response(
@@ -59,6 +64,7 @@ class TestTokenCounter(unittest.TestCase):
         self.assertEqual(len(counter.model_token.model_cost), 3)
         print(counter.model_token)
 
+    @unittest.skipUnless(_RUN_LIVE, "NERIF_RUN_LIVE_TESTS not set — skipping live API tests")
     def test_couting_agent(self):
         counter = NerifTokenCounter()
         chat_agent = SimpleChatModel(counter=counter)
@@ -74,6 +80,7 @@ class TestTokenCounter(unittest.TestCase):
         self.assertEqual(len(counter.model_token.model_cost), 2)
         print(counter.model_token)
 
+    @unittest.skipUnless(_RUN_LIVE, "NERIF_RUN_LIVE_TESTS not set — skipping live API tests")
     def test_couting_nerif(self):
         counter = NerifTokenCounter()
         if nerif("the sky is blue", counter=counter):

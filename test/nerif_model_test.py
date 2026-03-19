@@ -1,9 +1,13 @@
+import os
 import unittest
 import warnings
 
 from nerif.model import LogitsChatModel, SimpleChatModel
 
+_RUN_LIVE = bool(os.environ.get("NERIF_RUN_LIVE_TESTS"))
 
+
+@unittest.skipUnless(_RUN_LIVE, "NERIF_RUN_LIVE_TESTS not set — skipping live API tests")
 class TestNerifAgent(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
