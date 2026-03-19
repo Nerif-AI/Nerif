@@ -9,8 +9,9 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
 import httpx
 
-from nerif.exceptions import ProviderError
-
+from ..exceptions import ProviderError
+from .constants import DEFAULT_TIMEOUT as _DEFAULT_TIMEOUT
+from .constants import LOGGER_NAME
 from .retry import DEFAULT_RETRY, RetryConfig, retry_async, retry_sync
 from .token_counter import NerifTokenCounter
 
@@ -98,10 +99,7 @@ OPENAI_EMBEDDING_MODEL: List[str] = [
 ]
 
 
-LOGGER = logging.getLogger("Nerif")
-
-# Default httpx timeout (30 seconds connect, 120 seconds read for LLM responses)
-_DEFAULT_TIMEOUT = httpx.Timeout(30.0, read=120.0)
+LOGGER = logging.getLogger(LOGGER_NAME)
 
 
 class MessageType(Enum):

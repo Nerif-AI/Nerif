@@ -4,7 +4,9 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-_CALLBACK_LOGGER = logging.getLogger("nerif.callbacks")
+from .constants import LOGGER_NAME
+
+_CALLBACK_LOGGER = logging.getLogger(f"{LOGGER_NAME}.callbacks")
 
 
 @dataclass
@@ -136,7 +138,7 @@ class LoggingCallbackHandler(CallbackHandler):
     """Built-in handler that logs all events via Python logging."""
 
     def __init__(self, logger=None):
-        self.logger = logger or logging.getLogger("nerif.callbacks")
+        self.logger = logger or logging.getLogger(f"{LOGGER_NAME}.callbacks")
 
     def on_llm_start(self, event: LLMStartEvent) -> None:
         self.logger.info("LLM request to %s (%d messages)", event.model, len(event.messages))

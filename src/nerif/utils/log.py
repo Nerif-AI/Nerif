@@ -5,6 +5,8 @@ import sys
 from datetime import datetime
 from typing import Literal
 
+from .constants import LOGGER_NAME
+
 INDENT = "\t"
 
 
@@ -16,7 +18,7 @@ def set_up_logging(
     std: bool = False,
     level: int | str = logging.DEBUG,
 ):
-    logger = logging.getLogger("Nerif")
+    logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(level)
 
     basic_formatting = NerifFormatter(fmt)
@@ -48,7 +50,6 @@ def timestamp_filename(filename, t_string):
     return f"{filename[:p_ext]}{t_string}{filename[p_ext:]}"
 
 
-# FIXME the name of formatter collide with nerif format, rethink a name
 class NerifFormatter(logging.Formatter):
     def __init__(self, fmt=None, datefmt=None, style="%", validate=True, *, defaults=None) -> None:
         super().__init__(fmt, datefmt, style, validate, defaults=defaults)

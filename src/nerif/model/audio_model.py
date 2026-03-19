@@ -4,9 +4,10 @@ from typing import Optional, Union
 
 import httpx
 
+from ..utils.constants import DEFAULT_TIMEOUT as _DEFAULT_TIMEOUT
+
 _OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 _OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
-_DEFAULT_TIMEOUT = httpx.Timeout(30.0, read=120.0)
 
 
 class AudioModel:
