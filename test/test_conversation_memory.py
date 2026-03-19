@@ -181,7 +181,7 @@ def test_save_produces_valid_json():
         mem.save(path)
         with open(path) as f:
             data = json.load(f)
-        assert data["version"] == "1.0"
+        assert data["version"] == "1.1"
         assert "messages" in data
         assert "summary" in data
         assert "metadata" in data
