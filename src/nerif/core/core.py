@@ -367,6 +367,8 @@ class Nerif:
                 response_format={"type": "json_object"},
             )
             parsed = _json.loads(response)
+            if not isinstance(parsed, dict):
+                return None
             answer = parsed.get("answer")
             if isinstance(answer, bool):
                 return answer
@@ -604,6 +606,8 @@ class NerifMatchString:
                 response_format={"type": "json_object"},
             )
             parsed = _json.loads(response)
+            if not isinstance(parsed, dict):
+                return None
             choice = parsed.get("choice")
             if isinstance(choice, int) and 0 <= choice < len(self.choices):
                 return choice
