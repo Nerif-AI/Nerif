@@ -2,6 +2,7 @@ from typing import Any, List, Optional
 
 from ..model import LogitsChatModel, SimpleChatModel, SimpleEmbeddingModel
 from ..utils import (
+    LOGGER,
     NERIF_DEFAULT_EMBEDDING_MODEL,
     NERIF_DEFAULT_LLM_MODEL,
     OPENAI_MODEL,
@@ -280,25 +281,18 @@ class Nerif:
         self.debug = debug
 
         if self.debug:
-            print(
-                "Nerif initialized with model:",
-                model,
-                "temperature:",
-                temperature,
-                "debug:",
-                debug,
-            )
+            LOGGER.debug("Nerif initialized with model: %s, temperature: %s, debug: %s", model, temperature, debug)
 
     def logits_mode(self, text: str):
         if self.debug:
-            print("Logits mode, text:", text)
+            LOGGER.debug("Logits mode, text: %s", text)
         self.logits_agent.temperature = self.temperature
         # replace <question> with the text
         question = "<question>\n" + text + "</question>\n"
         user_prompt = self.prompt.replace("<question>", question)
         response = self.logits_agent.chat(user_prompt, max_tokens=1)
         if self.debug:
-            print("Logits mode, response:", response)
+            LOGGER.debug("Logits mode, response: %s", response)
         if not (hasattr(response, "choices") and len(response.choices) > 0):
             return None
         # if choices doesn't have no logprobs, raise an exception
@@ -309,10 +303,7 @@ class Nerif:
         # Try to find the most likely logprob
         for index in range(len(sorted_logprobs)):
             if self.debug:
-                print(
-                    "Logits mode, sorted_logprobs[index]:",
-                    sorted_logprobs[index]["token"],
-                )
+                LOGGER.debug("Logits mode, sorted_logprobs[index]: %s", sorted_logprobs[index]["token"])
             simple_fit = self.verification.simple_fit(sorted_logprobs[index]["token"])
             if simple_fit is not None:
                 return simple_fit
@@ -320,7 +311,7 @@ class Nerif:
 
     def embedding_mode(self, text: str):
         if self.debug:
-            print("Embedding mode, text:", text)
+            LOGGER.debug("Embedding mode, text: %s", text)
         self.agent.temperature = self.temperature
         # replace <question> with the text
         question = "<question>\n" + text + "</question>\n"
@@ -360,7 +351,7 @@ class Nerif:
 
     def judge(self, text, max_retry=3):
         if self.debug:
-            print("Judge, text:", text)
+            LOGGER.debug("Judge, text: %s", text)
         self.agent.temperature = self.temperature
         try_id = 0
         result = None
@@ -372,7 +363,7 @@ class Nerif:
                 try_id += 1
                 if result is None:
                     if self.debug:
-                        print("logits mode failed, {} try".format(try_id))
+                        LOGGER.debug("logits mode failed, %d try", try_id)
                     continue
                 else:
                     return result
