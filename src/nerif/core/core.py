@@ -349,31 +349,89 @@ class Nerif:
         # Final fallback
         return "true" in response.lower()
 
-    def judge(self, text, max_retry=3):
-        if self.debug:
-            LOGGER.debug("Judge, text: %s", text)
-        self.agent.temperature = self.temperature
-        try_id = 0
-        result = None
+    def json_mode(self, text: str):
+        """Judge using JSON structured output. Returns True/False or None on failure."""
+        import json as _json
 
-        # Try logits mode first
-        if support_logit_mode(self.model):
-            while try_id < max_retry:
-                result = self.logits_mode(text)
-                try_id += 1
-                if result is None:
-                    if self.debug:
-                        LOGGER.debug("logits mode failed, %d try", try_id)
-                    continue
-                else:
+        self.agent.temperature = self.temperature
+        user_prompt = (
+            "Given the following text, determine if the statement is true or false.\n"
+            f"<question>\n{text}\n</question>\n"
+            'Respond with a JSON object: {"answer": true} or {"answer": false}.'
+        )
+
+        try:
+            response = self.agent.chat(
+                user_prompt,
+                max_tokens=20,
+                response_format={"type": "json_object"},
+            )
+            parsed = _json.loads(response)
+            answer = parsed.get("answer")
+            if isinstance(answer, bool):
+                return answer
+            if isinstance(answer, str):
+                if answer.lower() == "true":
+                    return True
+                if answer.lower() == "false":
+                    return False
+        except (ValueError, KeyError, TypeError):
+            pass
+        return None
+
+    def judge(self, text, max_retry=3, strategy=None):
+        """Judge truthfulness using a multi-tier chain.
+
+        Args:
+            text: Statement to judge.
+            max_retry: Max retries for logits mode.
+            strategy: List of modes to try in order.
+                      Default: ["json", "logits", "embedding", "force_fit"]
+        """
+        if strategy is None:
+            strategy = ["json", "logits", "embedding", "force_fit"]
+
+        if self.debug:
+            LOGGER.debug("Judge, text: %s, strategy: %s", text, strategy)
+        self.agent.temperature = self.temperature
+
+        for mode in strategy:
+            if mode == "json":
+                result = self.json_mode(text)
+                if result is not None:
                     return result
 
-        # Use embedding mode if available, otherwise text fallback
-        if self.verification.has_embedding:
-            result = self.embedding_mode(text)
-        else:
-            result = self.text_fallback_mode(text)
-        return result
+            elif mode == "logits":
+                if support_logit_mode(self.model):
+                    for _ in range(max_retry):
+                        result = self.logits_mode(text)
+                        if result is not None:
+                            return result
+
+            elif mode == "embedding":
+                if self.verification.has_embedding:
+                    return self.embedding_mode(text)
+                else:
+                    return self.text_fallback_mode(text)
+
+            elif mode == "text_fallback":
+                return self.text_fallback_mode(text)
+
+            elif mode == "force_fit":
+                if self.verification.has_embedding:
+                    return self.verification.force_fit(
+                        self.agent.chat(
+                            self.prompt.replace(
+                                "<question>",
+                                "<question>\n" + text + "</question>\n",
+                            ),
+                            max_tokens=10,
+                        )
+                    )
+                else:
+                    return self.text_fallback_mode(text)
+
+        return self.text_fallback_mode(text)
 
     @classmethod
     def instance(
@@ -384,9 +442,10 @@ class Nerif:
         embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
         debug=False,
         counter=None,
+        strategy=None,
     ):
         new_instance = cls(model=model, embed_model=embed_model, debug=debug, counter=counter)
-        return new_instance.judge(text, max_retry=max_retry)
+        return new_instance.judge(text, max_retry=max_retry, strategy=strategy)
 
 
 def nerif(
@@ -395,8 +454,9 @@ def nerif(
     embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
     debug=False,
     counter=None,
+    strategy=None,
 ):
-    return Nerif.instance(text, model=model, embed_model=embed_model, debug=debug, counter=counter)
+    return Nerif.instance(text, model=model, embed_model=embed_model, debug=debug, counter=counter, strategy=strategy)
 
 
 class NerifMatchString:
@@ -523,22 +583,74 @@ class NerifMatchString:
         # Final fallback: return 0
         return 0
 
-    def match(self, text, max_retry=3):
-        self.agent.temperature = self.temperature
-        try_id = 0
+    def json_mode(self, text: str):
+        """Match using JSON structured output. Returns choice index or None on failure."""
+        import json as _json
 
-        if support_logit_mode(self.model):
-            while try_id < max_retry:
-                result = self.logits_mode(text)
-                try_id += 1
+        self.agent.temperature = self.temperature
+        options_text = "\n".join(f"{i}. {item}" for i, item in enumerate(self.choices))
+        user_prompt = (
+            "Given the following options:\n"
+            f"<options>\n{options_text}\n</options>\n"
+            f"<question>\n{text}\n</question>\n"
+            'Choose the best option. Respond with a JSON object: {"choice": N} '
+            "where N is the option number (0-indexed)."
+        )
+
+        try:
+            response = self.agent.chat(
+                user_prompt,
+                max_tokens=20,
+                response_format={"type": "json_object"},
+            )
+            parsed = _json.loads(response)
+            choice = parsed.get("choice")
+            if isinstance(choice, int) and 0 <= choice < len(self.choices):
+                return choice
+        except (ValueError, KeyError, TypeError):
+            pass
+        return None
+
+    def match(self, text, max_retry=3, strategy=None):
+        """Match best choice using multi-tier chain."""
+        if strategy is None:
+            strategy = ["json", "logits", "embedding", "force_fit"]
+
+        self.agent.temperature = self.temperature
+
+        for mode in strategy:
+            if mode == "json":
+                result = self.json_mode(text)
                 if result is not None:
                     return result
-
-        if self.verification.has_embedding:
-            result = self.embedding_mode(text)
-        else:
-            result = self.text_fallback_mode(text)
-        return result
+            elif mode == "logits":
+                if support_logit_mode(self.model):
+                    for _ in range(max_retry):
+                        result = self.logits_mode(text)
+                        if result is not None:
+                            return result
+            elif mode == "embedding":
+                if self.verification.has_embedding:
+                    return self.embedding_mode(text)
+                else:
+                    return self.text_fallback_mode(text)
+            elif mode == "text_fallback":
+                return self.text_fallback_mode(text)
+            elif mode == "force_fit":
+                if self.verification.has_embedding:
+                    return self.verification.force_fit(
+                        self.agent.chat(
+                            self.prompt.rsplit("<question>", 1)[0]
+                            + "<question>\n"
+                            + text
+                            + "</question>\n"
+                            + self.prompt.rsplit("<question>", 1)[1],
+                            max_tokens=300,
+                        )
+                    )
+                else:
+                    return 0
+        return 0
 
     @classmethod
     def instance(
@@ -549,6 +661,7 @@ class NerifMatchString:
         model=NERIF_DEFAULT_LLM_MODEL,
         embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
         counter=None,
+        strategy=None,
     ):
         new_instance = cls(
             selections,
@@ -556,7 +669,7 @@ class NerifMatchString:
             embed_model=embed_model,
             counter=counter,
         )
-        return new_instance.match(text, max_retry=max_retry)
+        return new_instance.match(text, max_retry=max_retry, strategy=strategy)
 
 
 def nerif_match_string(
@@ -565,6 +678,7 @@ def nerif_match_string(
     model=NERIF_DEFAULT_LLM_MODEL,
     embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
     counter=None,
+    strategy=None,
 ) -> int:
     return NerifMatchString.instance(
         selections,
@@ -572,6 +686,7 @@ def nerif_match_string(
         model=model,
         embed_model=embed_model,
         counter=counter,
+        strategy=strategy,
     )
 
 
@@ -581,6 +696,7 @@ def nerif_match(
     model=NERIF_DEFAULT_LLM_MODEL,
     embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
     counter=None,
+    strategy=None,
 ) -> int:
     return NerifMatchString.instance(
         selections,
@@ -588,4 +704,5 @@ def nerif_match(
         model=model,
         embed_model=embed_model,
         counter=counter,
+        strategy=strategy,
     )
