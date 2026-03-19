@@ -66,10 +66,7 @@ except ImportError:
     ImageCompressor = None
     compress_image_simple = None
 
-try:
-    from .format import FormatVerifierPydantic
-except ImportError:
-    FormatVerifierPydantic = None
+from .format import FormatVerifierPydantic
 
 __all__ = [
     # retry
