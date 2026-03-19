@@ -162,3 +162,109 @@ class TestMemoryPersistConfig:
             assert len(loaded._messages) == 1
         finally:
             os.unlink(path)
+
+
+class TestAgentToolContinuation:
+    """Test that agent doesn't send empty user message after tool results."""
+
+    @patch("nerif.model.model.get_model_response")
+    def test_no_empty_user_message_after_tools(self, mock_response):
+        from nerif.agent import NerifAgent, Tool
+
+        mock_tc = MagicMock()
+        mock_tc.id = "tc_1"
+        mock_tc.function.name = "test_tool"
+        mock_tc.function.arguments = '{"x": 1}'
+
+        tool_choice = MagicMock()
+        tool_choice.message.content = None
+        tool_choice.message.tool_calls = [mock_tc]
+
+        text_choice = MagicMock()
+        text_choice.message.content = "done"
+        text_choice.message.tool_calls = None
+
+        mock_response.side_effect = [
+            MagicMock(choices=[tool_choice]),
+            MagicMock(choices=[text_choice]),
+        ]
+
+        agent = NerifAgent()
+        agent.register_tool(Tool(name="test_tool", description="test", parameters={}, func=lambda x: str(x)))
+        agent.run("use the tool")
+
+        messages = agent.model.messages
+        empty_user_msgs = [m for m in messages if m["role"] == "user" and m["content"] == ""]
+        assert len(empty_user_msgs) == 0, "Agent should not append empty user messages"
+
+
+class TestJudgmentChainJsonMode:
+    """Test the new JSON mode tier in the judgment chain."""
+
+    @patch("nerif.model.model.get_model_response")
+    def test_nerif_json_mode_returns_bool(self, mock_response):
+        from nerif.core.core import Nerif
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"answer": true}'
+        mock_choice.message.tool_calls = None
+        mock_response.return_value = MagicMock(choices=[mock_choice])
+
+        n = Nerif()
+        result = n.json_mode("The sky is blue")
+        assert result is True
+
+    @patch("nerif.model.model.get_model_response")
+    def test_nerif_json_mode_false(self, mock_response):
+        from nerif.core.core import Nerif
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"answer": false}'
+        mock_choice.message.tool_calls = None
+        mock_response.return_value = MagicMock(choices=[mock_choice])
+
+        n = Nerif()
+        result = n.json_mode("The sky is green")
+        assert result is False
+
+    @patch("nerif.model.model.get_model_response")
+    def test_nerif_json_mode_invalid_json_returns_none(self, mock_response):
+        from nerif.core.core import Nerif
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "not json at all"
+        mock_choice.message.tool_calls = None
+        mock_response.return_value = MagicMock(choices=[mock_choice])
+
+        n = Nerif()
+        result = n.json_mode("The sky is blue")
+        assert result is None
+
+    @patch("nerif.model.model.get_model_response")
+    def test_nerif_match_json_mode(self, mock_response):
+        from nerif.core.core import NerifMatchString
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"choice": 1}'
+        mock_choice.message.tool_calls = None
+        mock_response.return_value = MagicMock(choices=[mock_choice])
+
+        matcher = NerifMatchString(["apple", "banana", "cherry"])
+        result = matcher.json_mode("I prefer yellow fruit")
+        assert result == 1
+
+    @patch("nerif.model.model.get_model_response")
+    def test_judge_default_strategy_starts_with_json(self, mock_response):
+        """Verify the default strategy tries JSON mode first."""
+        from nerif.core.core import Nerif
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"answer": true}'
+        mock_choice.message.tool_calls = None
+        mock_response.return_value = MagicMock(choices=[mock_choice])
+
+        n = Nerif()
+        result = n.judge("The sky is blue")
+        assert result is True
+        # JSON mode succeeded on first call, so only 1 API call
+        assert mock_response.call_count == 1

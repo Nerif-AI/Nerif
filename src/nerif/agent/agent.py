@@ -140,10 +140,8 @@ class NerifAgent:
                     }
                 )
 
-            # Send tool results back to model
-            result = self.model.chat(
-                "",  # empty message - the tool results are already in history
-                append=True,
+            # Send tool results back to model without appending an empty user message
+            result = self.model._continue_after_tools(
                 tools=tool_dicts,
                 tool_choice="auto" if tool_dicts else None,
             )
@@ -190,9 +188,7 @@ class NerifAgent:
                     {"role": "tool", "tool_call_id": result[0].id, "content": tool_result}
                 )
 
-            result = await self.model.achat(
-                "",
-                append=True,
+            result = await self.model._acontinue_after_tools(
                 tools=tool_dicts,
                 tool_choice="auto" if tool_dicts else None,
             )
