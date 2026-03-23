@@ -43,6 +43,8 @@ pip install "nerif[rag]"      # NumPy vector store for RAG
 pip install "nerif[img-gen]"   # Image generation (Pillow)
 ```
 
+For local development setup, see `docs/setup_guide.md`.
+
 ## QuickStart
 
 ```python
