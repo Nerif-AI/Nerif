@@ -5,6 +5,7 @@ from .core import (
     NerificationInt,
     NerificationString,
     NerifMatchString,
+    nerif as core,
     nerif,
     nerif_match,
     nerif_match_string,
@@ -21,6 +22,7 @@ __all__ = [
     # match
     "NerifMatchString",
     # instance mode
+    "core",
     "nerif",
     "nerif_match",
     "nerif_match_string",
