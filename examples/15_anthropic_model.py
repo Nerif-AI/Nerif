@@ -2,6 +2,7 @@
 
 Requires: ANTHROPIC_API_KEY environment variable.
 """
+
 from nerif.model import SimpleChatModel, ToolDefinition
 
 # Basic chat

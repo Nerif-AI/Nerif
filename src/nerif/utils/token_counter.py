@@ -310,13 +310,15 @@ class NerifTokenCounter:
             latencies = self.latency_by_model.get(model_name, [])
             avg_lat = sum(latencies) / len(latencies) if latencies else 0.0
             cost = self._calculate_cost(model_name, mc.request, mc.response)
-            rows.append([
-                model_name,
-                str(mc.request),
-                str(mc.response),
-                f"{avg_lat:.1f}",
-                f"${cost:.6f}",
-            ])
+            rows.append(
+                [
+                    model_name,
+                    str(mc.request),
+                    str(mc.response),
+                    f"{avg_lat:.1f}",
+                    f"${cost:.6f}",
+                ]
+            )
 
         lines = [_simple_table(headers, rows)]
         total = self.successful_requests + self.failed_requests

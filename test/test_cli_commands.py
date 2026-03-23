@@ -30,7 +30,11 @@ class TestCLIModels:
     def test_models_via_main(self):
         """nerif models should list supported prefixes."""
         result = subprocess.run(
-            [sys.executable, "-c", "import sys; sys.argv = ['nerif', 'models']; from nerif.cli.main import main; main()"],
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.argv = ['nerif', 'models']; from nerif.cli.main import main; main()",
+            ],
             capture_output=True,
             text=True,
         )
@@ -52,7 +56,11 @@ class TestCLIMain:
 
     def test_unknown_command(self):
         result = subprocess.run(
-            [sys.executable, "-c", "import sys; sys.argv = ['nerif', 'foobar']; from nerif.cli.main import main; exit(main())"],
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.argv = ['nerif', 'foobar']; from nerif.cli.main import main; exit(main())",
+            ],
             capture_output=True,
             text=True,
         )

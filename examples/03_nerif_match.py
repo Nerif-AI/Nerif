@@ -2,9 +2,7 @@ from nerif.core import nerif_match_string
 
 selections = ["iPhone 5", "iPhone 6", "iPhone 12"]
 
-result = nerif_match_string(
-    selections=selections, text="Which iPhone is the most powerful one?"
-)
+result = nerif_match_string(selections=selections, text="Which iPhone is the most powerful one?")
 
 print(result)
 

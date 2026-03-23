@@ -267,9 +267,7 @@ class TestAsyncAgentPlusMemory:
         """Async agent should work with ConversationMemory."""
         memory = ConversationMemory(max_messages=20)
         agent = NerifAgent(model="gpt-4o", memory=memory)
-        agent.register_tool(
-            Tool(name="greet", description="Greet", parameters={}, func=lambda name: f"Hello {name}")
-        )
+        agent.register_tool(Tool(name="greet", description="Greet", parameters={}, func=lambda name: f"Hello {name}"))
 
         async def run():
             with (

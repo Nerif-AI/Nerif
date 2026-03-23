@@ -104,7 +104,7 @@ class Batch:
         supported_endpoints = ["/v1/chat/completions", "/v1/embeddings", "/v1/completions"]
         if endpoint not in supported_endpoints:
             raise ValueError(
-                f"Unsupported endpoint '{endpoint}'. " f"Supported endpoints: {', '.join(supported_endpoints)}"
+                f"Unsupported endpoint '{endpoint}'. Supported endpoints: {', '.join(supported_endpoints)}"
             )
 
         # Validate completion window
@@ -217,7 +217,7 @@ class Batch:
 
         # Check if batch can be cancelled
         if batch["status"] not in [BatchStatus.VALIDATING, BatchStatus.IN_PROGRESS]:
-            raise ValueError(f"Batch '{batch_id}' cannot be cancelled. " f"Current status: {batch['status']}")
+            raise ValueError(f"Batch '{batch_id}' cannot be cancelled. Current status: {batch['status']}")
 
         # Update status
         batch["status"] = BatchStatus.CANCELLING

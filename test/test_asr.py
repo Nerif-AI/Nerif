@@ -12,8 +12,9 @@ from nerif.model.audio_model import AudioModel
 
 class TestAudioModelEnhanced:
     def test_init_custom(self):
-        model = AudioModel(model="whisper-1", api_key="k", base_url="http://x/v1",
-                           language="en", response_format="verbose_json")
+        model = AudioModel(
+            model="whisper-1", api_key="k", base_url="http://x/v1", language="en", response_format="verbose_json"
+        )
         assert model.language == "en"
         assert model.response_format == "verbose_json"
 
@@ -115,8 +116,9 @@ class TestTranscriber:
         t = Transcriber(api_key="k", base_url="http://test/v1")
 
         async def run():
-            with patch.object(t._audio_model, "atranscribe", new_callable=AsyncMock,
-                              return_value={"text": "async hello"}):
+            with patch.object(
+                t._audio_model, "atranscribe", new_callable=AsyncMock, return_value={"text": "async hello"}
+            ):
                 result = await t.atranscribe(file=("f", b"d"))
                 assert result == "async hello"
 

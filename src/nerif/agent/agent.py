@@ -280,14 +280,10 @@ class NerifAgent:
             if len(result) > 1:
                 tool_results = await asyncio.gather(*[self._execute_tool_call_async(tc) for tc in result])
                 for tool_call, tool_result in zip(result, tool_results):
-                    self.model.messages.append(
-                        {"role": "tool", "tool_call_id": tool_call.id, "content": tool_result}
-                    )
+                    self.model.messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": tool_result})
             else:
                 tool_result = await self._execute_tool_call_async(result[0])
-                self.model.messages.append(
-                    {"role": "tool", "tool_call_id": result[0].id, "content": tool_result}
-                )
+                self.model.messages.append({"role": "tool", "tool_call_id": result[0].id, "content": tool_result})
 
             result = await self.model._acontinue_after_tools(
                 tools=tool_dicts,
