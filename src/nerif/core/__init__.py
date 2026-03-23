@@ -5,10 +5,12 @@ from .core import (
     NerificationInt,
     NerificationString,
     NerifMatchString,
-    nerif as core,
     nerif,
     nerif_match,
     nerif_match_string,
+)
+from .core import (
+    nerif as core,
 )
 
 __all__ = [
