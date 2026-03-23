@@ -147,11 +147,15 @@ class SimpleChatModel:
         self.fallback_config = None
         if fallback:
             self.fallback_config = FallbackConfig(models=[model] + fallback)
+        self.last_response = None
+        self.last_response_model = model
+        self.last_latency_ms = 0.0
 
         if memory is not None:
             # Use the memory's internal list as the canonical message store.
             # Seed the system message via memory so window management is aware.
-            memory.add_message("system", default_prompt)
+            if not memory._messages:
+                memory.add_message("system", default_prompt)
             self.messages: List[Any] = memory._messages
         else:
             self.messages: List[Any] = [
@@ -278,6 +282,11 @@ class SimpleChatModel:
 
         return text_result
 
+    def _record_response_metadata(self, result, model_name: str, latency_ms: float) -> None:
+        self.last_response = result
+        self.last_response_model = getattr(result, "model", model_name)
+        self.last_latency_ms = latency_ms
+
     def chat(
         self,
         message: Union[str, MultiModalMessage],
@@ -342,6 +351,7 @@ class SimpleChatModel:
                 ),
             )
 
+        self._record_response_metadata(result, kwargs["model"], (_time.time() - llm_start_time) * 1000)
         return self._process_chat_result(result, append, response_model)
 
     def stream_chat(
@@ -460,6 +470,7 @@ class SimpleChatModel:
                 ),
             )
 
+        self._record_response_metadata(result, kwargs["model"], (_time.time() - llm_start_time) * 1000)
         return self._process_chat_result(result, append, response_model)
 
     def _continue_after_tools(self, tools=None, tool_choice=None):
@@ -517,6 +528,7 @@ class SimpleChatModel:
                 cost_usd=0.0,
             ))
 
+        self._record_response_metadata(result, kwargs["model"], (_time.time() - llm_start_time) * 1000)
         return self._process_chat_result(result, append=True)
 
     async def _acontinue_after_tools(self, tools=None, tool_choice=None):
@@ -570,6 +582,7 @@ class SimpleChatModel:
                 cost_usd=0.0,
             ))
 
+        self._record_response_metadata(result, kwargs["model"], (_time.time() - llm_start_time) * 1000)
         return self._process_chat_result(result, append=True)
 
     async def astream_chat(
