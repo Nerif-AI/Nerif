@@ -12,6 +12,27 @@ if TYPE_CHECKING:
     from .agent import NerifAgent
 
 
+def _maybe_start_span(name: str):
+    try:
+        from ..observability.tracing import SpanKind, _current_collector, start_span
+
+        if _current_collector.get() is not None:
+            return start_span(name, SpanKind.ORCHESTRATOR)
+    except ImportError:
+        pass
+    return None
+
+
+def _maybe_end_span(ctx, error=None):
+    if ctx is not None:
+        try:
+            from ..observability.tracing import end_span
+
+            end_span(ctx, error=error)
+        except ImportError:
+            pass
+
+
 class AgentPipeline:
     """Sequential pipeline: each agent's output feeds as input to the next."""
 
@@ -21,6 +42,17 @@ class AgentPipeline:
 
     def run(self, message: str) -> AgentResult:
         """Run all stages sequentially. Returns the final AgentResult."""
+        ctx = _maybe_start_span("orchestrator:pipeline")
+        error = None
+        try:
+            return self._run_inner(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            _maybe_end_span(ctx, error=error)
+
+    def _run_inner(self, message: str) -> AgentResult:
         current_input = message
         total_usage = TokenUsage()
         all_tool_calls = []
@@ -48,6 +80,17 @@ class AgentPipeline:
 
     async def arun(self, message: str) -> AgentResult:
         """Async version of run()."""
+        ctx = _maybe_start_span("orchestrator:pipeline")
+        error = None
+        try:
+            return await self._arun_inner(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            _maybe_end_span(ctx, error=error)
+
+    async def _arun_inner(self, message: str) -> AgentResult:
         current_input = message
         total_usage = TokenUsage()
         all_tool_calls = []
@@ -141,13 +184,29 @@ class AgentRouter:
 
     def run(self, message: str) -> AgentResult:
         """Route the message to the selected agent and run it."""
-        selected = self._select_agent(message)
-        return self.agents[selected].run(message)
+        ctx = _maybe_start_span("orchestrator:router")
+        error = None
+        try:
+            selected = self._select_agent(message)
+            return self.agents[selected].run(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            _maybe_end_span(ctx, error=error)
 
     async def arun(self, message: str) -> AgentResult:
         """Async version of run()."""
-        selected = await self._aselect_agent(message)
-        return await self.agents[selected].arun(message)
+        ctx = _maybe_start_span("orchestrator:router")
+        error = None
+        try:
+            selected = await self._aselect_agent(message)
+            return await self.agents[selected].arun(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            _maybe_end_span(ctx, error=error)
 
 
 class AgentParallel:
@@ -167,6 +226,17 @@ class AgentParallel:
 
     def run(self, message: str) -> AgentResult:
         """Run all agents sequentially (use arun for true parallelism)."""
+        ctx = _maybe_start_span("orchestrator:parallel")
+        error = None
+        try:
+            return self._run_inner(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            _maybe_end_span(ctx, error=error)
+
+    def _run_inner(self, message: str) -> AgentResult:
         started = _time.perf_counter()
         results = [agent.run(message) for agent in self.agents]
         total_usage = TokenUsage()
@@ -187,6 +257,17 @@ class AgentParallel:
 
     async def arun(self, message: str) -> AgentResult:
         """Run all agents concurrently via asyncio.gather."""
+        ctx = _maybe_start_span("orchestrator:parallel")
+        error = None
+        try:
+            return await self._arun_inner(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            _maybe_end_span(ctx, error=error)
+
+    async def _arun_inner(self, message: str) -> AgentResult:
         started = _time.perf_counter()
         gathered = await asyncio.gather(*[agent.arun(message) for agent in self.agents])
         results = list(gathered)

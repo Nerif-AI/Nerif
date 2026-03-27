@@ -196,6 +196,27 @@ class NerifAgent:
             self.model.memory = None
             self.model.messages = deepcopy(state.messages)
 
+    def _maybe_start_span(self, name: str):
+        """Start a tracing span if a TraceCollector is active. Returns context or None."""
+        try:
+            from ..observability.tracing import SpanKind, _current_collector, start_span
+
+            if _current_collector.get() is not None:
+                return start_span(name, SpanKind.AGENT)
+        except ImportError:
+            pass
+        return None
+
+    def _maybe_end_span(self, ctx, error=None):
+        """End a tracing span if one was started."""
+        if ctx is not None:
+            try:
+                from ..observability.tracing import end_span
+
+                end_span(ctx, error=error)
+            except ImportError:
+                pass
+
     def run(self, message: str) -> AgentResult:
         """
         Run the agent with a user message and return a structured result.
@@ -203,6 +224,17 @@ class NerifAgent:
         The agent will loop through tool calls until it produces a text response
         or hits max_iterations.
         """
+        span_ctx = self._maybe_start_span(f"agent:{self.model.model}")
+        error = None
+        try:
+            return self._run_inner(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            self._maybe_end_span(span_ctx, error=error)
+
+    def _run_inner(self, message: str) -> AgentResult:
         tool_dicts = self._get_tool_dicts() if self.tools else None
         total_usage = TokenUsage()
         all_tool_calls: List[ToolCallRecord] = []
@@ -254,6 +286,17 @@ class NerifAgent:
         When multiple tool calls are returned in a single response,
         they are executed concurrently via asyncio.gather().
         """
+        span_ctx = self._maybe_start_span(f"agent:{self.model.model}")
+        error = None
+        try:
+            return await self._arun_inner(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            self._maybe_end_span(span_ctx, error=error)
+
+    async def _arun_inner(self, message: str) -> AgentResult:
         tool_dicts = self._get_tool_dicts() if self.tools else None
         total_usage = TokenUsage()
         all_tool_calls: List[ToolCallRecord] = []
