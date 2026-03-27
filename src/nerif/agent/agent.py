@@ -7,13 +7,14 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..memory import ConversationMemory, SharedMemory
 from ..model.model import SimpleChatModel, ToolCallResult
+from ..utils.constants import LOGGER_NAME
 from .state import AgentResult, AgentState, TokenUsage, ToolCallRecord
 from .tool import Tool
 
 if TYPE_CHECKING:
     from ..utils.callbacks import CallbackManager
 
-LOGGER = logging.getLogger("Nerif")
+LOGGER = logging.getLogger(LOGGER_NAME)
 
 
 class NerifAgent:
