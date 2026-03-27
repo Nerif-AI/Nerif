@@ -65,6 +65,8 @@ class NerificationBase:
 
         possible_values: list of possible values to verify. Only store lower case string
         """
+        if possible_values is None:
+            possible_values = []
         self.original_options = possible_values
         # Convert the possible value to lower case
         self.possible = []
@@ -283,6 +285,17 @@ class Nerif:
         if self.debug:
             LOGGER.debug("Nerif initialized with model: %s, temperature: %s, debug: %s", model, temperature, debug)
 
+    def _normalize_result(self, result: Any):
+        if isinstance(result, bool) or result is None:
+            return result
+
+        if self.verification.verify(result):
+            normalized_result = self.verification.simple_fit(result)
+            if normalized_result is not None:
+                return normalized_result
+
+        return result
+
     def logits_mode(self, text: str):
         if self.debug:
             LOGGER.debug("Logits mode, text: %s", text)
@@ -306,7 +319,7 @@ class Nerif:
                 LOGGER.debug("Logits mode, sorted_logprobs[index]: %s", sorted_logprobs[index]["token"])
             simple_fit = self.verification.simple_fit(sorted_logprobs[index]["token"])
             if simple_fit is not None:
-                return simple_fit
+                return self._normalize_result(simple_fit)
         return None
 
     def embedding_mode(self, text: str):
@@ -320,14 +333,14 @@ class Nerif:
         try:
             direct_result = int(response)
             if self.verification.verify(direct_result):
-                return direct_result
+                return self._normalize_result(direct_result)
         except (ValueError, TypeError):
             pass
         simple_fit = self.verification.simple_fit(response)
         if simple_fit is not None:
-            return simple_fit
+            return self._normalize_result(simple_fit)
         force_fit = self.verification.force_fit(response)
-        return force_fit
+        return self._normalize_result(force_fit)
 
     def text_fallback_mode(self, text: str):
         """Fallback when no embedding model is available. Uses LLM + string matching only."""
@@ -494,7 +507,12 @@ class NerifMatchString:
         temperature=0,
         counter=None,
     ):
-        self.choices = choices
+        self.option_keys = None
+        if isinstance(choices, dict):
+            self.option_keys = list(choices.keys())
+            self.choices = list(choices.values())
+        else:
+            self.choices = list(choices)
         self.model = model
         self.prompt = (
             "Given the following text, determine the best choice to make.\n"
@@ -514,13 +532,33 @@ class NerifMatchString:
         self.logits_agent = LogitsChatModel(model=model, temperature=temperature, counter=counter)
         self.verification = NerificationInt(
             model=embed_model,
-            possible_values=[x for x in range(0, len(choices))],
+            possible_values=[x for x in range(0, len(self.choices))],
             counter=counter,
         )
         self.instruction_verification = NerificationString(
             model=embed_model,
-            possible_values=choices,
+            possible_values=self.choices,
         )
+
+    def _resolve_choice(self, result):
+        if self.option_keys is None:
+            return result
+
+        if isinstance(result, int) and 0 <= result < len(self.option_keys):
+            return self.option_keys[result]
+
+        string_result = str(result).strip()
+        if string_result.isdigit():
+            index = int(string_result)
+            if 0 <= index < len(self.option_keys):
+                return self.option_keys[index]
+
+        normalized_result = str(result).lower()
+        for index, choice in enumerate(self.choices):
+            if str(choice).lower() == normalized_result:
+                return self.option_keys[index]
+
+        return result
 
     def logits_mode(self, text):
         self.logits_agent.temperature = self.temperature
@@ -632,29 +670,31 @@ class NerifMatchString:
                     for _ in range(max_retry):
                         result = self.logits_mode(text)
                         if result is not None:
-                            return result
+                            return self._resolve_choice(result)
             elif mode == "embedding":
                 if self.verification.has_embedding:
-                    return self.embedding_mode(text)
+                    return self._resolve_choice(self.embedding_mode(text))
                 else:
-                    return self.text_fallback_mode(text)
+                    return self._resolve_choice(self.text_fallback_mode(text))
             elif mode == "text_fallback":
-                return self.text_fallback_mode(text)
+                return self._resolve_choice(self.text_fallback_mode(text))
             elif mode == "force_fit":
                 if self.verification.has_embedding:
-                    return self.verification.force_fit(
-                        self.agent.chat(
-                            self.prompt.rsplit("<question>", 1)[0]
-                            + "<question>\n"
-                            + text
-                            + "</question>\n"
-                            + self.prompt.rsplit("<question>", 1)[1],
-                            max_tokens=300,
+                    return self._resolve_choice(
+                        self.verification.force_fit(
+                            self.agent.chat(
+                                self.prompt.rsplit("<question>", 1)[0]
+                                + "<question>\n"
+                                + text
+                                + "</question>\n"
+                                + self.prompt.rsplit("<question>", 1)[1],
+                                max_tokens=300,
+                            )
                         )
                     )
                 else:
-                    return 0
-        return 0
+                    return self._resolve_choice(0)
+        return self._resolve_choice(0)
 
     @classmethod
     def instance(
@@ -677,8 +717,8 @@ class NerifMatchString:
 
 
 def nerif_match_string(
-    selections,
     text,
+    selections,
     model=NERIF_DEFAULT_LLM_MODEL,
     embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
     counter=None,
@@ -695,8 +735,8 @@ def nerif_match_string(
 
 
 def nerif_match(
-    selections,
     text,
+    selections,
     model=NERIF_DEFAULT_LLM_MODEL,
     embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
     counter=None,

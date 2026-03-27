@@ -1,7 +1,5 @@
 """Tests for the agent module."""
 
-
-
 from nerif.agent import NerifAgent, Tool, tool
 
 

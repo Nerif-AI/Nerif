@@ -36,8 +36,7 @@ Nerif/
 ## Development Commands
 
 ```bash
-pip install -e ".[dev]"          # Editable install with dev deps
-pip install -e ".[dev,pydantic]" # With Pydantic support
+pip install -e ".[dev]"          # Editable install with dev deps (pydantic included)
 pytest test/                     # Run all tests
 pytest test/nerif_format_test.py # Run specific test file
 ruff check src/ test/ examples/  # Lint (must pass before committing)

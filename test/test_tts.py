@@ -19,8 +19,9 @@ class TestSpeechModelEnhanced:
         assert model.speed == 1.0
 
     def test_init_custom(self):
-        model = SpeechModel(api_key="k", base_url="http://test/v1",
-                            model="tts-1-hd", voice="nova", response_format="opus", speed=1.5)
+        model = SpeechModel(
+            api_key="k", base_url="http://test/v1", model="tts-1-hd", voice="nova", response_format="opus", speed=1.5
+        )
         assert model.model == "tts-1-hd"
         assert model.voice == "nova"
 
@@ -99,8 +100,7 @@ class TestSynthesizer:
         s = Synthesizer(api_key="k", base_url="http://test/v1")
 
         async def run():
-            with patch.object(s._speech_model, "atext_to_speech",
-                              new_callable=AsyncMock, return_value=b"async_audio"):
+            with patch.object(s._speech_model, "atext_to_speech", new_callable=AsyncMock, return_value=b"async_audio"):
                 result = await s.aspeak("hello")
                 assert result == b"async_audio"
 

@@ -1,4 +1,5 @@
 """Example: Using the @tool() decorator vs Tool class for agent tools."""
+
 from nerif.agent import Tool, tool
 
 # Method 1: Using Tool class directly
@@ -16,6 +17,7 @@ add_tool = Tool(
     func=lambda a, b: a + b,
 )
 
+
 # Method 2: Using @tool() decorator
 @tool(
     name="multiply",
@@ -31,6 +33,7 @@ add_tool = Tool(
 )
 def multiply(x, y):
     return x * y
+
 
 # Both produce Tool instances
 print(f"add_tool type: {type(add_tool)}")

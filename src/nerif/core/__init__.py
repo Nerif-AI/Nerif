@@ -9,6 +9,9 @@ from .core import (
     nerif_match,
     nerif_match_string,
 )
+from .core import (
+    nerif as core,
+)
 
 __all__ = [
     # nerif
@@ -21,6 +24,7 @@ __all__ = [
     # match
     "NerifMatchString",
     # instance mode
+    "core",
     "nerif",
     "nerif_match",
     "nerif_match_string",

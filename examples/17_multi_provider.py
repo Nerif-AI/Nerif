@@ -2,6 +2,7 @@
 
 Demonstrates Nerif's provider-agnostic API. Set the relevant API keys.
 """
+
 from nerif.model import SimpleChatModel
 
 providers = {
