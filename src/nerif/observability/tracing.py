@@ -368,11 +368,13 @@ class TraceCollector:
     has zero coupling to the collector instance.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, store: Optional[Any] = None) -> None:
         # trace_id -> list of spans (in submission order)
         self._active_traces: Dict[str, List[Span]] = {}
-        # Completed traces keyed by trace_id
-        self.store: Dict[str, Trace] = {}
+        # Completed traces keyed by trace_id (in-memory)
+        self._traces: Dict[str, Trace] = {}
+        # Optional persistent TraceStore backend
+        self._persistent_store = store
         self.last_trace_id: Optional[str] = None
 
     # ------------------------------------------------------------------
@@ -425,8 +427,13 @@ class TraceCollector:
             metadata={},
         )
 
-        self.store[trace_id] = trace
+        self._traces[trace_id] = trace
         self.last_trace_id = trace_id
+
+        # Persist to external store if configured
+        if self._persistent_store is not None:
+            self._persistent_store.save_trace(trace)
+
         return trace
 
 

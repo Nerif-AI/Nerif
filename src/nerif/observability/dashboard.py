@@ -57,15 +57,10 @@ class TraceDashboard:
         """Return an ASCII tree showing the span hierarchy for *trace_id*.
 
         Each node shows: ``<name>  [<duration_ms:.1f> ms]  [<total_tokens> tok]``
-
-        Raises
-        ------
-        KeyError
-            If *trace_id* is not found in the store.
         """
         trace = self._store.get_trace(trace_id)
         if trace is None:
-            raise KeyError(f"Trace {trace_id!r} not found")
+            return f"Trace {trace_id} not found."
 
         # Build parent -> children mapping
         children: Dict[Optional[str], List[Span]] = {}
@@ -112,7 +107,7 @@ class TraceDashboard:
         if trace_id is not None:
             trace = self._store.get_trace(trace_id)
             if trace is None:
-                raise KeyError(f"Trace {trace_id!r} not found")
+                return f"Trace {trace_id} not found."
             traces = [trace]
         else:
             summaries = self._store.list_traces(limit=100)
@@ -182,7 +177,7 @@ class TraceDashboard:
 
         trace = self._store.get_trace(trace_id)
         if trace is None:
-            raise KeyError(f"Trace {trace_id!r} not found")
+            return f"Trace {trace_id} not found."
 
         agent_spans = [s for s in trace.spans if s.kind == SpanKind.AGENT]
         headers = ["Agent", "Duration (ms)", "Prompt Tokens", "Completion Tokens", "Status"]
