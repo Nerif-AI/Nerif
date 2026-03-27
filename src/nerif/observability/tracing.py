@@ -428,3 +428,101 @@ class TraceCollector:
         self.store[trace_id] = trace
         self.last_trace_id = trace_id
         return trace
+
+
+# ---------------------------------------------------------------------------
+# TracingCallbackHandler
+# ---------------------------------------------------------------------------
+
+
+from nerif.utils.callbacks import (  # noqa: E402
+    CallbackHandler,
+    FallbackEvent,
+    LLMEndEvent,
+    LLMErrorEvent,
+    LLMStartEvent,
+    RetryEvent,
+    ToolCallEvent,
+)
+
+
+class TracingCallbackHandler(CallbackHandler):
+    """Callback handler that maps LLM/tool events to tracing spans.
+
+    Attach this handler to a :class:`CallbackManager` to automatically create
+    child spans inside whatever span is currently active in the context.
+    """
+
+    def __init__(self, collector: TraceCollector) -> None:
+        self._collector = collector
+        self._llm_span_ctx: Optional[_SpanContext] = None
+
+    def on_llm_start(self, event: LLMStartEvent) -> None:
+        """Open an LLM span if a collector is active."""
+        if _current_collector.get() is None:
+            return
+        self._llm_span_ctx = start_span(
+            f"llm:{event.model}",
+            SpanKind.LLM,
+            model=event.model,
+            message_count=len(event.messages),
+        )
+
+    def on_llm_end(self, event: LLMEndEvent) -> None:
+        """Close the in-flight LLM span and attach token usage."""
+        ctx = self._llm_span_ctx
+        if ctx is None:
+            return
+        self._llm_span_ctx = None
+        ctx.span.token_usage = TokenUsage(
+            prompt_tokens=event.prompt_tokens,
+            completion_tokens=event.completion_tokens,
+            total_tokens=event.prompt_tokens + event.completion_tokens,
+        )
+        end_span(ctx)
+
+    def on_llm_error(self, event: LLMErrorEvent) -> None:
+        """Close the in-flight LLM span with an error status."""
+        ctx = self._llm_span_ctx
+        if ctx is None:
+            return
+        self._llm_span_ctx = None
+        end_span(ctx, error=event.error)
+
+    def on_tool_call(self, event: ToolCallEvent) -> None:
+        """Create and immediately close a TOOL span for a tool invocation."""
+        if _current_collector.get() is None:
+            return
+        ctx = start_span(
+            f"tool:{event.tool_name}",
+            SpanKind.TOOL,
+            tool_name=event.tool_name,
+            success=event.success,
+        )
+        if not event.success:
+            end_span(ctx, error=Exception(f"Tool {event.tool_name} failed"))
+        else:
+            end_span(ctx)
+
+    def on_retry(self, event: RetryEvent) -> None:
+        """Annotate the current span with a retry event."""
+        span = get_current_span()
+        if span is None:
+            return
+        span.add_event(
+            "retry",
+            model=event.model,
+            attempt=event.attempt,
+            delay=event.delay,
+        )
+
+    def on_fallback(self, event: FallbackEvent) -> None:
+        """Annotate the current span with a fallback event."""
+        span = get_current_span()
+        if span is None:
+            return
+        span.add_event(
+            "fallback",
+            failed_model=event.failed_model,
+            next_model=event.next_model,
+        )
