@@ -36,6 +36,8 @@ dev = ["bumpver", "ruff", "pytest", "pytest-asyncio"]
 rag = ["numpy"]
 image = ["Pillow>=9.0.0"]
 native = ["nerif_native"]
+viz = ["jinja2>=3.1"]
+otel = ["opentelemetry-api>=1.20", "opentelemetry-sdk>=1.20"]
 
 [project.scripts]
 nerif = "nerif.cli.main:main"
