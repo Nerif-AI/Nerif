@@ -176,6 +176,8 @@ class NerifTokenCounter:
         self.retried_requests: int = 0
         self.total_latency_ms: float = 0.0
         self.latency_by_model: Dict[str, List[float]] = {}
+        self.successful_by_model: Dict[str, int] = {}
+        self.failed_by_model: Dict[str, int] = {}
 
         # Cost
         self.model_pricing: Dict[str, ModelPricing] = dict(DEFAULT_PRICING)
@@ -226,6 +228,7 @@ class NerifTokenCounter:
 
         if success:
             self.successful_requests += 1
+            self.successful_by_model[model] = self.successful_by_model.get(model, 0) + 1
             cost = self._calculate_cost(model, prompt_tokens, completion_tokens)
 
             if self.on_request_end is not None:
@@ -240,6 +243,7 @@ class NerifTokenCounter:
                 self.on_request_end(event)
         else:
             self.failed_requests += 1
+            self.failed_by_model[model] = self.failed_by_model.get(model, 0) + 1
             if self.on_error is not None:
                 event = RequestErrorEvent(
                     model=model,
@@ -285,8 +289,12 @@ class NerifTokenCounter:
     def success_rate(self, model: Optional[str] = None) -> float:
         """Success rate as a percentage (0-100)."""
         if model is not None:
-            # Per-model success rate not tracked separately; return overall
-            pass
+            s = self.successful_by_model.get(model, 0)
+            f = self.failed_by_model.get(model, 0)
+            total = s + f
+            if total == 0:
+                return 100.0
+            return (s / total) * 100.0
         total = self.successful_requests + self.failed_requests
         if total == 0:
             return 100.0
@@ -300,6 +308,8 @@ class NerifTokenCounter:
         self.retried_requests = 0
         self.total_latency_ms = 0.0
         self.latency_by_model.clear()
+        self.successful_by_model.clear()
+        self.failed_by_model.clear()
 
     def summary(self) -> str:
         """Pretty table summarizing tokens, latency, cost, and success rate."""
@@ -329,6 +339,44 @@ class NerifTokenCounter:
             )
         lines.append(f"Total estimated cost: ${self.total_cost():.6f}")
         return "\n".join(lines)
+
+    def record_retry(self, model: str) -> None:
+        self.retried_requests += 1
+
+    def to_dict(self) -> dict:
+        """Export all counter state as a plain dictionary."""
+        models = {}
+        for model_name, mc in self.model_token.model_cost.items():
+            latencies = self.latency_by_model.get(model_name, [])
+            models[model_name] = {
+                "input_tokens": mc.request,
+                "output_tokens": mc.response,
+                "avg_latency_ms": sum(latencies) / len(latencies) if latencies else 0.0,
+                "estimated_cost_usd": self._calculate_cost(model_name, mc.request, mc.response),
+                "successful_requests": self.successful_by_model.get(model_name, 0),
+                "failed_requests": self.failed_by_model.get(model_name, 0),
+            }
+        return {
+            "models": models,
+            "total_requests": self.total_requests,
+            "successful_requests": self.successful_requests,
+            "failed_requests": self.failed_requests,
+            "retried_requests": self.retried_requests,
+            "total_latency_ms": self.total_latency_ms,
+            "total_cost_usd": self.total_cost(),
+            "success_rate": self.success_rate(),
+        }
+
+    def to_json(self, indent: int = 2) -> str:
+        """Export counter state as a JSON string."""
+        import json
+        return json.dumps(self.to_dict(), indent=indent)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return False
 
     def __repr__(self) -> str:
         return repr(self.model_token)

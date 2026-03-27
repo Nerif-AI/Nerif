@@ -1962,7 +1962,7 @@ def get_model_response(
 
     _start = time.monotonic()
     try:
-        responses = retry_sync(_call, retry_config=retry_config or DEFAULT_RETRY)
+        responses = retry_sync(_call, retry_config=retry_config or DEFAULT_RETRY, counter=counter, model=model)
     except httpx.HTTPStatusError as exc:
         _latency = (time.monotonic() - _start) * 1000.0
         if counter is not None:
@@ -2049,7 +2049,7 @@ async def get_model_response_async(
 
     _start = time.monotonic()
     try:
-        responses = await retry_async(_call, retry_config=retry_config or DEFAULT_RETRY)
+        responses = await retry_async(_call, retry_config=retry_config or DEFAULT_RETRY, counter=counter, model=model)
     except httpx.HTTPStatusError as exc:
         _latency = (time.monotonic() - _start) * 1000.0
         if counter is not None:
