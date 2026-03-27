@@ -1,9 +1,12 @@
 import ast
+import json as _json
 import logging
+import logging.handlers
+import os
 import re
 import sys
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from .constants import LOGGER_NAME
 
@@ -11,35 +14,61 @@ INDENT = "\t"
 
 
 def set_up_logging(
-    out_file: None | str = None,
+    out_file: Optional[str] = None,
     time_stamp: bool = True,
     mode: Literal["a", "w"] = "a",
     fmt: str = "%(levelname)s\t%(name)s\t%(asctime)s\t%(message)s",
     std: bool = False,
     level: int | str = logging.DEBUG,
+    json_format: bool = False,
+    max_bytes: int = 0,
+    backup_count: int = 5,
 ):
+    """Configure the Nerif logger.
+
+    Args:
+        out_file: Path to log file. If None, no file logging.
+        time_stamp: Append timestamp to filename.
+        mode: File open mode ('a' or 'w'). Ignored when max_bytes > 0.
+        fmt: Log format string (ignored when json_format=True).
+        std: Also log to stdout.
+        level: Log level (e.g. logging.DEBUG, "INFO").
+        json_format: Use JSON structured output instead of text.
+        max_bytes: Enable rotating file handler when > 0 (bytes per file).
+        backup_count: Number of rotated backup files to keep.
+    """
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(level)
 
-    basic_formatting = NerifFormatter(fmt)
+    formatter = JsonFormatter() if json_format else NerifFormatter(fmt)
 
     if out_file is not None:
         if time_stamp:
             t_string = datetime.now().strftime(" %Y-%m-%d %H-%M-%S")
             out_file = timestamp_filename(out_file, t_string)
 
-        file_handler = logging.FileHandler(out_file, mode=mode)
-        file_handler.setFormatter(basic_formatting)
+        if max_bytes > 0:
+            file_handler = logging.handlers.RotatingFileHandler(
+                out_file, maxBytes=max_bytes, backupCount=backup_count
+            )
+        else:
+            file_handler = logging.FileHandler(out_file, mode=mode)
+        file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
     if std:
         stream_handler = logging.StreamHandler(sys.stdout)
-        stream_handler.setFormatter(basic_formatting)
+        stream_handler.setFormatter(formatter)
         logger.addHandler(stream_handler)
 
     if std or out_file is not None:
         logger.info("-" * 20)
         logger.info("logging enabled")
+
+
+def enable_debug_logging():
+    """Quick helper to enable DEBUG-level logging to stdout."""
+    set_up_logging(std=True, level=logging.DEBUG)
 
 
 def timestamp_filename(filename, t_string):
@@ -48,6 +77,21 @@ def timestamp_filename(filename, t_string):
 
     p_ext = filename.rindex(".")
     return f"{filename[:p_ext]}{t_string}{filename[p_ext:]}"
+
+
+class JsonFormatter(logging.Formatter):
+    """Structured JSON log formatter for machine-parseable output."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info and record.exc_info[0] is not None:
+            entry["exception"] = self.formatException(record.exc_info)
+        return _json.dumps(entry, ensure_ascii=False)
 
 
 class NerifFormatter(logging.Formatter):
@@ -89,3 +133,21 @@ class NerifFormatter(logging.Formatter):
             return f'"{d}"'
 
         return str(d)
+
+
+# --- Auto-configure from environment variables ---
+def _auto_configure():
+    """Apply environment-variable-based logging configuration at import time."""
+    _env_level = os.environ.get("NERIF_LOG_LEVEL")
+    _env_file = os.environ.get("NERIF_LOG_FILE")
+    if _env_level or _env_file:
+        level = getattr(logging, _env_level.upper(), logging.DEBUG) if _env_level else logging.DEBUG
+        set_up_logging(
+            out_file=_env_file,
+            time_stamp=False,
+            std=bool(_env_level and not _env_file),
+            level=level,
+        )
+
+
+_auto_configure()

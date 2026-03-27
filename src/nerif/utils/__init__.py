@@ -20,11 +20,20 @@ from .format import (
     FormatVerifierListInt,
     NerifFormat,
 )
-from .log import NerifFormatter, set_up_logging, timestamp_filename
+from .log import JsonFormatter, NerifFormatter, enable_debug_logging, set_up_logging, timestamp_filename
 from .prompt import PromptTemplate
 from .rate_limit import RateLimitConfig, RateLimiter, RateLimiterRegistry, rate_limiters
 from .retry import AGGRESSIVE_RETRY, DEFAULT_RETRY, NO_RETRY, RetryConfig, retry_async, retry_sync
-from .token_counter import ModelCost, NerifTokenCounter, OllamaResponseParser, OpenAIResponseParser, ResponseParserBase
+from .token_counter import (
+    ModelCost,
+    NerifTokenCounter,
+    OllamaResponseParser,
+    OpenAIResponseParser,
+    RequestEndEvent,
+    RequestErrorEvent,
+    RequestStartEvent,
+    ResponseParserBase,
+)
 from .utils import (
     ANTHROPIC_API_KEY,
     GOOGLE_API_KEY,
@@ -90,6 +99,8 @@ __all__ = [
     "ImageCompressor",
     "compress_image_simple",
     # log
+    "JsonFormatter",
+    "enable_debug_logging",
     "NerifFormatter",
     "set_up_logging",
     "timestamp_filename",
@@ -99,6 +110,9 @@ __all__ = [
     "ResponseParserBase",
     "OpenAIResponseParser",
     "OllamaResponseParser",
+    "RequestStartEvent",
+    "RequestEndEvent",
+    "RequestErrorEvent",
     # response types
     "ChatCompletionResponse",
     "EmbeddingResponse",

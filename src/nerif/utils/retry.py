@@ -49,7 +49,7 @@ DEFAULT_RETRY = RetryConfig()
 AGGRESSIVE_RETRY = RetryConfig(max_retries=5, base_delay=0.5)
 
 
-def retry_sync(func, *args, retry_config: Optional[RetryConfig] = None, **kwargs):
+def retry_sync(func, *args, retry_config: Optional[RetryConfig] = None, counter=None, model="", **kwargs):
     """Execute a function with retry logic."""
     config = retry_config or DEFAULT_RETRY
     last_exception = None
@@ -70,10 +70,12 @@ def retry_sync(func, *args, retry_config: Optional[RetryConfig] = None, **kwargs
                     except ValueError:
                         pass
             time.sleep(delay)
+            if counter is not None:
+                counter.record_retry(model)
     raise last_exception
 
 
-async def retry_async(func, *args, retry_config: Optional[RetryConfig] = None, **kwargs):
+async def retry_async(func, *args, retry_config: Optional[RetryConfig] = None, counter=None, model="", **kwargs):
     """Execute an async function with retry logic."""
     import asyncio
 
@@ -95,4 +97,6 @@ async def retry_async(func, *args, retry_config: Optional[RetryConfig] = None, *
                     except ValueError:
                         pass
             await asyncio.sleep(delay)
+            if counter is not None:
+                counter.record_retry(model)
     raise last_exception
