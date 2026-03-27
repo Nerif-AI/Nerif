@@ -1,11 +1,59 @@
 """Conversation memory management for Nerif chat models."""
 
 import json
+from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 from ..utils import get_model_response
 
 DEFAULT_SUMMARY_PROMPT = "Summarize the following conversation concisely, preserving key facts and context:"
+
+
+class SharedMemory:
+    """Namespace-backed shared conversation state for one or more agents."""
+
+    def __init__(self, initial_state: Optional[Dict[str, Dict[str, Any]]] = None):
+        self._store: Dict[str, Dict[str, Any]] = {}
+        if initial_state:
+            self.restore(initial_state)
+
+    def _ensure_namespace(self, namespace: str) -> Dict[str, Any]:
+        if namespace not in self._store:
+            self._store[namespace] = {
+                "messages": [],
+                "summary": None,
+                "metadata": {},
+            }
+        return self._store[namespace]
+
+    def messages(self, namespace: str = "default") -> List[Dict[str, Any]]:
+        return self._ensure_namespace(namespace)["messages"]
+
+    def metadata(self, namespace: str = "default") -> Dict[str, Any]:
+        return self._ensure_namespace(namespace)["metadata"]
+
+    def get_summary(self, namespace: str = "default") -> Optional[str]:
+        return self._ensure_namespace(namespace)["summary"]
+
+    def set_summary(self, summary: Optional[str], namespace: str = "default") -> None:
+        self._ensure_namespace(namespace)["summary"] = summary
+
+    def snapshot(self) -> Dict[str, Dict[str, Any]]:
+        return deepcopy(self._store)
+
+    def restore(self, state: Dict[str, Dict[str, Any]]) -> None:
+        state = deepcopy(state)
+        existing_namespaces = set(self._store.keys())
+        incoming_namespaces = set(state.keys())
+
+        for namespace in existing_namespaces | incoming_namespaces:
+            target = self._ensure_namespace(namespace)
+            source = state.get(namespace, {"messages": [], "summary": None, "metadata": {}})
+            target["messages"].clear()
+            target["messages"].extend(source.get("messages", []))
+            target["summary"] = source.get("summary")
+            target["metadata"].clear()
+            target["metadata"].update(source.get("metadata", {}))
 
 
 class ConversationMemory:
@@ -36,6 +84,8 @@ class ConversationMemory:
         summarize_model: str = "gpt-4o-mini",
         summary_prompt: Optional[str] = None,
         counter: Optional[Any] = None,
+        shared_memory: Optional[SharedMemory] = None,
+        namespace: str = "default",
     ):
         self.max_messages = max_messages
         self.max_tokens = max_tokens
@@ -43,10 +93,36 @@ class ConversationMemory:
         self.summarize_model = summarize_model
         self.summary_prompt = summary_prompt if summary_prompt is not None else DEFAULT_SUMMARY_PROMPT
         self.counter = counter
+        self.shared_memory = shared_memory or SharedMemory()
+        self.namespace = namespace
 
-        self._messages: List[Dict[str, Any]] = []
-        self._summary: Optional[str] = None
-        self._metadata: Dict[str, Any] = {}
+    @property
+    def _messages(self) -> List[Dict[str, Any]]:
+        return self.shared_memory.messages(self.namespace)
+
+    @_messages.setter
+    def _messages(self, value: List[Dict[str, Any]]) -> None:
+        messages = self.shared_memory.messages(self.namespace)
+        messages.clear()
+        messages.extend(value)
+
+    @property
+    def _summary(self) -> Optional[str]:
+        return self.shared_memory.get_summary(self.namespace)
+
+    @_summary.setter
+    def _summary(self, value: Optional[str]) -> None:
+        self.shared_memory.set_summary(value, namespace=self.namespace)
+
+    @property
+    def _metadata(self) -> Dict[str, Any]:
+        return self.shared_memory.metadata(self.namespace)
+
+    @_metadata.setter
+    def _metadata(self, value: Dict[str, Any]) -> None:
+        metadata = self.shared_memory.metadata(self.namespace)
+        metadata.clear()
+        metadata.update(value)
 
     def add_message(self, role: str, content: Any) -> None:
         """Append a message and trigger window management."""
@@ -234,6 +310,39 @@ class ConversationMemory:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "version": "1.2",
+            "namespace": self.namespace,
+            "config": {
+                "max_messages": self.max_messages,
+                "max_tokens": self.max_tokens,
+                "summarize": self.summarize,
+                "summarize_model": self.summarize_model,
+                "summary_prompt": self.summary_prompt if self.summary_prompt != DEFAULT_SUMMARY_PROMPT else None,
+            },
+            "shared_memory": self.shared_memory.snapshot(),
+        }
+
+    def restore(self, state: Dict[str, Any]) -> None:
+        config = state.get("config", {})
+        self.max_messages = config.get("max_messages")
+        self.max_tokens = config.get("max_tokens")
+        self.summarize = config.get("summarize", False)
+        self.summarize_model = config.get("summarize_model", "gpt-4o-mini")
+        self.summary_prompt = config.get("summary_prompt") or DEFAULT_SUMMARY_PROMPT
+        self.namespace = state.get("namespace", self.namespace)
+
+        if "shared_memory" in state:
+            self.shared_memory.restore(state["shared_memory"])
+            return
+
+        # Backward-compatible restore for the single-memory save/load format.
+        self.clear()
+        self._summary = state.get("summary")
+        self._messages.extend(state.get("messages", []))
+        self._metadata = state.get("metadata", {})
+
     @classmethod
     def load(cls, path: str) -> "ConversationMemory":
         """Deserialize a ConversationMemory from a JSON file."""
@@ -248,7 +357,5 @@ class ConversationMemory:
             summarize_model=config.get("summarize_model", "gpt-4o-mini"),
             summary_prompt=config.get("summary_prompt"),
         )
-        instance._summary = data.get("summary")
-        instance._messages = data.get("messages", [])
-        instance._metadata = data.get("metadata", {})
+        instance.restore(data)
         return instance

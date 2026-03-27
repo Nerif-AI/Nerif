@@ -1,3 +1,3 @@
-from .conversation import ConversationMemory
+from .conversation import ConversationMemory, SharedMemory
 
-__all__ = ["ConversationMemory"]
+__all__ = ["ConversationMemory", "SharedMemory"]

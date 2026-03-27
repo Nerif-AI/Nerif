@@ -267,9 +267,7 @@ class TestAsyncAgentPlusMemory:
         """Async agent should work with ConversationMemory."""
         memory = ConversationMemory(max_messages=20)
         agent = NerifAgent(model="gpt-4o", memory=memory)
-        agent.register_tool(
-            Tool(name="greet", description="Greet", parameters={}, func=lambda name: f"Hello {name}")
-        )
+        agent.register_tool(Tool(name="greet", description="Greet", parameters={}, func=lambda name: f"Hello {name}"))
 
         async def run():
             with (
@@ -279,7 +277,8 @@ class TestAsyncAgentPlusMemory:
                 mock_achat.return_value = [ToolCallResult(id="c1", name="greet", arguments='{"name": "Alice"}')]
                 mock_continue.return_value = "Greeting sent!"
                 result = await agent.arun("Greet Alice")
-                assert result == "Greeting sent!"
+                assert result.content == "Greeting sent!"
+                assert len(result.tool_calls) == 1
 
             # When achat is mocked, it doesn't add user/assistant messages to the list.
             # But agent's arun() does append tool messages directly to model.messages.
@@ -561,7 +560,8 @@ class TestAllFeaturesCombined:
                 mock_achat.return_value = [ToolCallResult(id="c1", name="compute", arguments='{"expr": "2+2"}')]
                 mock_continue.return_value = "The answer is 4."
                 result = await agent.arun("What is 2+2?")
-                assert result == "The answer is 4."
+                assert result.content == "The answer is 4."
+                assert len(result.tool_calls) == 1
 
             # Verify async tool was used
             assert calls == ["2+2"]

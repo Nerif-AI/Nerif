@@ -158,9 +158,7 @@ class LoggingCallbackHandler(CallbackHandler):
         self.logger.warning("Fallback: %s -> %s due to %s", event.failed_model, event.next_model, event.error)
 
     def on_retry(self, event: RetryEvent) -> None:
-        self.logger.info(
-            "Retry %d/%d for %s (delay=%.1fs)", event.attempt, event.max_retries, event.model, event.delay
-        )
+        self.logger.info("Retry %d/%d for %s (delay=%.1fs)", event.attempt, event.max_retries, event.model, event.delay)
 
     def on_memory(self, event: MemoryEvent) -> None:
         self.logger.info("Memory %s: %d -> %d messages", event.action, event.messages_before, event.messages_after)

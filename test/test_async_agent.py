@@ -28,13 +28,13 @@ class TestToolAsync:
             return a + b
 
         t = Tool(name="add", description="Add", parameters={}, func=lambda a, b: a + b, async_func=async_add)
-        result = asyncio.get_event_loop().run_until_complete(t.aexecute(a=1, b=2))
+        result = asyncio.run(t.aexecute(a=1, b=2))
         assert result == 3
         assert calls == ["async"]
 
     def test_aexecute_falls_back_to_sync(self):
         t = Tool(name="add", description="Add", parameters={}, func=lambda a, b: a + b)
-        result = asyncio.get_event_loop().run_until_complete(t.aexecute(a=1, b=2))
+        result = asyncio.run(t.aexecute(a=1, b=2))
         assert result == 3
 
     def test_execute_still_works(self):
@@ -78,9 +78,10 @@ class TestNerifAgentAsync:
             with patch.object(agent.model, "achat", new_callable=AsyncMock) as mock_achat:
                 mock_achat.return_value = "The weather is sunny."
                 result = await agent.arun("What's the weather?")
-                assert result == "The weather is sunny."
+                assert result.content == "The weather is sunny."
+                assert result.iterations == 1
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_arun_tool_call_then_text(self):
         agent = NerifAgent(model="gpt-4o")
@@ -96,11 +97,12 @@ class TestNerifAgentAsync:
                 mock_achat.return_value = _make_mock_tool_calls()
                 mock_continue.return_value = "It's sunny in Tokyo."
                 result = await agent.arun("Weather in Tokyo?")
-                assert result == "It's sunny in Tokyo."
+                assert result.content == "It's sunny in Tokyo."
+                assert len(result.tool_calls) == 1
                 mock_achat.assert_called_once()
                 mock_continue.assert_called_once()
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_arun_uses_async_tool(self):
         calls = []
@@ -130,7 +132,7 @@ class TestNerifAgentAsync:
                 await agent.arun("Weather in London?")
                 assert calls == ["async"]
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_arun_max_iterations(self):
         agent = NerifAgent(model="gpt-4o", max_iterations=2)
@@ -144,9 +146,9 @@ class TestNerifAgentAsync:
                 mock_achat.return_value = [ToolCallResult(id="c1", name="noop", arguments="{}")]
                 mock_continue.return_value = [ToolCallResult(id="c2", name="noop", arguments="{}")]
                 result = await agent.arun("Do something")
-                assert "maximum iterations" in result.lower()
+                assert "maximum iterations" in result.content.lower()
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_arun_parallel_tool_calls(self):
         call_order = []
@@ -172,10 +174,11 @@ class TestNerifAgentAsync:
                 ]
                 mock_continue.return_value = "Done"
                 result = await agent.arun("Weather in A and B")
-                assert result == "Done"
+                assert result.content == "Done"
+                assert len(result.tool_calls) == 2
                 assert set(call_order) == {"A", "B"}
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_arun_tool_not_found(self):
         agent = NerifAgent(model="gpt-4o")
@@ -188,9 +191,9 @@ class TestNerifAgentAsync:
                 mock_achat.return_value = [ToolCallResult(id="c1", name="nonexistent", arguments="{}")]
                 mock_continue.return_value = "Fallback response"
                 result = await agent.arun("Do X")
-                assert result == "Fallback response"
+                assert result.content == "Fallback response"
                 tool_msgs = [m for m in agent.model.messages if m.get("role") == "tool"]
                 assert len(tool_msgs) == 1
                 assert "not found" in tool_msgs[0]["content"]
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())

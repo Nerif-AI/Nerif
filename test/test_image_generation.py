@@ -357,7 +357,11 @@ class TestNanoBananaModel:
         mock_resp.json.return_value = {
             "candidates": [
                 {"content": {"parts": [{"text": "part1"}]}},
-                {"content": {"parts": [{"text": "part2"}, {"inlineData": {"mimeType": "image/png", "data": "ZGF0YQ=="}}]}},
+                {
+                    "content": {
+                        "parts": [{"text": "part2"}, {"inlineData": {"mimeType": "image/png", "data": "ZGF0YQ=="}}]
+                    }
+                },
             ]
         }
         mock_resp.raise_for_status = MagicMock()

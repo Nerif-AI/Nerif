@@ -56,7 +56,9 @@ def test_basic_text_completion(mock_post):
 
     # Verify httpx.post was called with the correct URL
     call_args = mock_post.call_args
-    assert "gemini-pro:generateContent" in call_args[0][0] or "gemini-pro:generateContent" in call_args.kwargs.get("url", call_args[0][0])
+    assert "gemini-pro:generateContent" in call_args[0][0] or "gemini-pro:generateContent" in call_args.kwargs.get(
+        "url", call_args[0][0]
+    )
     assert "key=fake-key" in call_args[0][0]
 
 
@@ -163,9 +165,7 @@ def test_tool_choice_required():
 
 
 def test_tool_choice_specific_function():
-    result = _convert_tool_choice_to_gemini(
-        {"type": "function", "function": {"name": "get_weather"}}
-    )
+    result = _convert_tool_choice_to_gemini({"type": "function", "function": {"name": "get_weather"}})
     assert result == {
         "functionCallingConfig": {
             "mode": "ANY",
@@ -253,9 +253,7 @@ def test_convert_base64_image():
         {"type": "text", "text": "Describe this image"},
         {
             "type": "image_url",
-            "image_url": {
-                "url": "data:image/png;base64,iVBORw0KGgoAAAANS"
-            },
+            "image_url": {"url": "data:image/png;base64,iVBORw0KGgoAAAANS"},
         },
     ]
 

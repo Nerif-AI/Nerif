@@ -1,7 +1,5 @@
 """Tests for tool calling and structured output features."""
 
-
-
 from nerif.model.model import MultiModalMessage, ToolCallResult, ToolDefinition
 from nerif.utils.format import FormatVerifierJson, NerifFormat
 
@@ -80,7 +78,7 @@ class TestFormatVerifierJson:
 
     def test_match_json_array(self):
         v = FormatVerifierJson()
-        result = v.match('Result: [1, 2, 3]')
+        result = v.match("Result: [1, 2, 3]")
         assert result == [1, 2, 3]
 
     def test_convert(self):

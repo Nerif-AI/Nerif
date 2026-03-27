@@ -28,7 +28,7 @@ def main():
     # Available models: mxbai-embed-large, nomic-embed-text, all-minilm
     print("Initializing Ollama embedding model...")
     embedder = OllamaEmbeddingModel(model="ollama/mxbai-embed-large")
-    
+
     # Example texts
     texts = [
         "The weather is nice today.",
@@ -36,45 +36,45 @@ def main():
         "Python is a programming language.",
         "I love coding in Python.",
     ]
-    
+
     print("\nGenerating embeddings for texts:")
     embeddings = []
     for i, text in enumerate(texts):
-        print(f"{i+1}. {text}")
+        print(f"{i + 1}. {text}")
         embedding = embedder.embed(text)
         embeddings.append(embedding)
-    
+
     # Calculate similarities
     print("\nSimilarity matrix:")
     print("   ", end="")
     for i in range(len(texts)):
-        print(f"  {i+1}  ", end="")
+        print(f"  {i + 1}  ", end="")
     print()
-    
+
     for i in range(len(texts)):
-        print(f"{i+1}: ", end="")
+        print(f"{i + 1}: ", end="")
         for j in range(len(texts)):
             sim = cosine_similarity(embeddings[i], embeddings[j])
             print(f"{sim:.3f} ", end="")
         print()
-    
+
     # Find most similar pairs
     print("\nMost similar text pairs:")
     similarities = []
     for i in range(len(texts)):
-        for j in range(i+1, len(texts)):
+        for j in range(i + 1, len(texts)):
             sim = cosine_similarity(embeddings[i], embeddings[j])
             similarities.append((sim, i, j))
-    
+
     similarities.sort(reverse=True)
     for sim, i, j in similarities[:3]:
-        print(f"- \"{texts[i]}\" <-> \"{texts[j]}\": {sim:.3f}")
-    
+        print(f'- "{texts[i]}" <-> "{texts[j]}": {sim:.3f}')
+
     # Example with different models
     print("\nComparing different Ollama embedding models:")
     models = ["ollama/mxbai-embed-large", "ollama/nomic-embed-text", "ollama/all-minilm"]
     test_text = "Machine learning is fascinating."
-    
+
     for model_name in models:
         try:
             model = OllamaEmbeddingModel(model=model_name)
