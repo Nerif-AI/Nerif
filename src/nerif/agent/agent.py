@@ -297,6 +297,39 @@ class NerifAgent:
         content = result if isinstance(result, str) else "Agent reached maximum iterations without a final response."
         return self._build_result(content, all_tool_calls, total_usage, started_at, iterations)
 
+    def as_tool(self, name: str, description: str) -> Tool:
+        """Wrap this agent as a Tool for use by another agent.
+
+        The returned Tool has both sync and async implementations.
+        When called, it runs this agent with the provided message and
+        returns the agent's text response.
+        """
+
+        def _sync_call(message: str) -> str:
+            result = self.run(message)
+            return result.content
+
+        async def _async_call(message: str) -> str:
+            result = await self.arun(message)
+            return result.content
+
+        return Tool(
+            name=name,
+            description=description,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "The message to send to the agent",
+                    },
+                },
+                "required": ["message"],
+            },
+            func=_sync_call,
+            async_func=_async_call,
+        )
+
     def reset(self) -> None:
         self.model.reset()
 
