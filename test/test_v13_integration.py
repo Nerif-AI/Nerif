@@ -231,6 +231,10 @@ class TestFallbackPlusCallbacks:
             result = model.chat("hello")
 
         assert result == "mini ok"
+        fallback_events = [e for e in handler.events if e[0] == "fallback"]
+        assert len(fallback_events) == 1
+        assert fallback_events[0][1].failed_model == "gpt-4o"
+        assert fallback_events[0][1].next_model == "gpt-4o-mini"
 
 
 class TestFallbackAsync:
@@ -382,6 +386,23 @@ class TestMemoryPlusCallbacks:
         user_msgs = [m for m in msgs if m["role"] == "user"]
         assert len(user_msgs) == 1
         assert user_msgs[0]["content"] == "Hello"
+
+    def test_memory_event_fires_when_summarizing(self):
+        memory = ConversationMemory(max_messages=4, summarize=True)
+        handler = RecordingHandler()
+        mgr = CallbackManager()
+        mgr.add_handler(handler)
+        SimpleChatModel(model="gpt-4o", memory=memory, callbacks=mgr)
+
+        with patch("nerif.memory.conversation.get_model_response") as mock:
+            mock.return_value = _make_response("summary text")
+            for i in range(6):
+                memory.add_message("user", f"msg {i}")
+                memory.add_message("assistant", f"reply {i}")
+
+        memory_events = [e for e in handler.events if e[0] == "memory"]
+        assert len(memory_events) >= 1
+        assert any(event.action == "summarize" for _, event in memory_events)
 
 
 # ---------------------------------------------------------------------------
@@ -580,7 +601,37 @@ class TestAllFeaturesCombined:
 # ---------------------------------------------------------------------------
 
 
-class TestNonRetryableErrorSkipsFallback:
+
+
+class TestToolPlusCallbacks:
+    def test_tool_call_event_fires(self):
+        handler = RecordingHandler()
+        mgr = CallbackManager()
+        mgr.add_handler(handler)
+
+        agent = NerifAgent(model="gpt-4o", callbacks=mgr)
+        agent.register_tool(
+            Tool(
+                name="greet",
+                description="Greet a user",
+                parameters={"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+                func=lambda name: f"Hello {name}",
+            )
+        )
+
+        with (
+            patch.object(agent.model, "chat") as mock_chat,
+            patch.object(agent.model, "_continue_after_tools") as mock_continue,
+        ):
+            mock_chat.return_value = [ToolCallResult(id="c1", name="greet", arguments='{"name": "Alice"}')]
+            mock_continue.return_value = "done"
+            result = agent.run("Say hi")
+
+        assert result.content == "done"
+        tool_events = [e for e in handler.events if e[0] == "tool_call"]
+        assert len(tool_events) == 1
+        assert tool_events[0][1].tool_name == "greet"
+        assert tool_events[0][1].success is True
     def test_400_error_raises_immediately(self):
         """A 400 Bad Request should not trigger fallback."""
         model = SimpleChatModel(

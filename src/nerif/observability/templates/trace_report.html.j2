@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Trace Report: {{ trace.trace_id }}</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 2em; background: #fafafa; }
+h1, h2 { color: #333; }
+.trace-id { color: #666; font-size: 0.8em; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #f5f5f5; }
+.span-tree { font-family: monospace; white-space: pre; background: #fff; padding: 1em; border: 1px solid #ddd; border-radius: 4px; }
+pre.mermaid { background: #fff; padding: 1em; border: 1px solid #ddd; border-radius: 4px; }
+details { margin: 0.5em 0; }
+summary { cursor: pointer; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Trace Report <span class="trace-id">{{ trace.trace_id }}</span></h1>
+<p>Root: <strong>{{ trace.root_span.name }}</strong> | Duration: <strong>{{ "%.0f"|format(duration_ms) }}ms</strong> | Tokens: <strong>{{ trace.total_token_usage.total_tokens }}</strong> | Cost: <strong>${{ "%.4f"|format(trace.total_cost_usd) }}</strong></p>
+
+<h2>Call Sequence</h2>
+<pre class="mermaid">
+sequenceDiagram
+{% for span in trace.spans %}{% if span.parent_span_id %}    {{ parent_names.get(span.parent_span_id, "root") }}->>{{ span.name }}: {{ span.kind.value }}
+    {{ span.name }}-->>{{ parent_names.get(span.parent_span_id, "root") }}: {{ "%.0f"|format(span.duration_ms() or 0) }}ms
+{% endif %}{% endfor %}</pre>
+
+<h2>Span Tree</h2>
+<div class="span-tree">{{ span_tree }}</div>
+
+<h2>Cost Breakdown</h2>
+<table>
+<tr><th>Span</th><th>Kind</th><th>Duration (ms)</th><th>Prompt Tokens</th><th>Completion Tokens</th><th>Total Tokens</th></tr>
+{% for span in trace.spans %}
+<tr>
+    <td>{{ span.name }}</td>
+    <td>{{ span.kind.value }}</td>
+    <td>{{ "%.0f"|format(span.duration_ms() or 0) }}</td>
+    <td>{{ span.token_usage.prompt_tokens if span.token_usage else 0 }}</td>
+    <td>{{ span.token_usage.completion_tokens if span.token_usage else 0 }}</td>
+    <td>{{ span.token_usage.total_tokens if span.token_usage else 0 }}</td>
+</tr>
+{% endfor %}
+</table>
+
+<h2>Span Details</h2>
+{% for span in trace.spans %}
+<details>
+    <summary>[{{ span.kind.value }}] {{ span.name }} — {{ "%.0f"|format(span.duration_ms() or 0) }}ms</summary>
+    <table>
+    <tr><th>Field</th><th>Value</th></tr>
+    <tr><td>Span ID</td><td>{{ span.span_id }}</td></tr>
+    <tr><td>Parent</td><td>{{ span.parent_span_id or "root" }}</td></tr>
+    <tr><td>Status</td><td>{{ span.status.value }}</td></tr>
+    {% if span.error %}<tr><td>Error</td><td>{{ span.error }}</td></tr>{% endif %}
+    {% for k, v in span.attributes.items() %}
+    <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
+    {% endfor %}
+    </table>
+</details>
+{% endfor %}
+
+<script>mermaid.initialize({startOnLoad: true});</script>
+</body>
+</html>

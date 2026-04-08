@@ -69,7 +69,7 @@ class TestSpeechModelEnhanced:
                 result = await model.atext_to_speech("Hello")
                 assert result == b"async_audio"
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_http_error(self):
         model = SpeechModel(api_key="k", base_url="http://test/v1")
@@ -104,4 +104,4 @@ class TestSynthesizer:
                 result = await s.aspeak("hello")
                 assert result == b"async_audio"
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())

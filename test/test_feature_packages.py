@@ -128,9 +128,13 @@ class TestLazyImport:
         assert mod1 is mod2
 
 
-# ---------------------------------------------------------------------------
-# Core package should NOT export feature-specific classes
-# ---------------------------------------------------------------------------
+    def test_top_level_exports_observability(self):
+        import nerif
+
+        assert "observability" in nerif.__all__
+        assert hasattr(nerif.observability, "TraceCollector")
+
+
 class TestModelPackageIsolation:
     def test_model_package_does_not_export_image_generation(self):
         import nerif.model

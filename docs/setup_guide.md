@@ -35,32 +35,25 @@ python -m pip install -e .
 
 ## 3. Configure provider credentials
 
-Nerif reads environment variables on import. You can either export them in your shell or create a local `.env`.
+Nerif reads provider settings from environment variables. Export them in your shell before running Python.
 
-Option A, create a local `.env` file in the repository root and fill in one of these provider setups:
+Typical setups:
 
-- OpenAI-compatible setup:
-  `OPENAI_API_KEY`
-  Optional: `OPENAI_API_BASE`, `OPENAI_PROXY_URL`
-- OpenRouter setup:
-  `OPENROUTER_API_KEY`
-  Optional: `OR_SITE_URL`, `OR_APP_NAME`
-- Ollama setup:
-  No cloud key is required, but you need a running Ollama server and a local model.
+- OpenAI-compatible:
+  - `OPENAI_API_KEY`
+  - optional: `OPENAI_API_BASE`
+- OpenRouter:
+  - `OPENAI_API_KEY`
+  - `OPENAI_API_BASE=https://openrouter.ai/api/v1`
+- Ollama:
+  - no cloud key required, but you need a running Ollama server and a pulled model
 
-Option B, export directly in your shell:
+Example:
 
-```powershell
-$env:OPENAI_API_KEY = "sk-..."
+```bash
+export OPENAI_API_KEY="sk-..."
+export NERIF_DEFAULT_LLM_MODEL=gpt-4o-mini
 ```
-
-or
-
-```powershell
-$env:OPENROUTER_API_KEY = "sk-or-..."
-```
-
-Persisting the variables is shell-specific. For Windows, `setx` works if you want them available in future terminals.
 
 ## 4. Verify the environment
 
@@ -73,20 +66,20 @@ python -m pytest test/nerif_format_test.py -q
 Minimal OpenAI-compatible smoke test:
 
 ```bash
-python -c "from nerif.agent import SimpleChatAgent; agent = SimpleChatAgent(model='gpt-4o-mini'); print(agent.chat('Reply with OK only.', max_tokens=3))"
+python -c "from nerif.model import SimpleChatModel; model = SimpleChatModel(model='gpt-4o-mini'); print(model.chat('Reply with OK only.', max_tokens=3))"
 ```
 
 Minimal OpenRouter smoke test:
 
 ```bash
-python -c "from nerif.agent import SimpleChatAgent; agent = SimpleChatAgent(model='openrouter/openai/gpt-4o-mini'); print(agent.chat('Reply with OK only.', max_tokens=3))"
+OPENAI_API_BASE=https://openrouter.ai/api/v1 python -c "from nerif.model import SimpleChatModel; model = SimpleChatModel(model='openrouter/openai/gpt-4o-mini'); print(model.chat('Reply with OK only.', max_tokens=3))"
 ```
 
 Minimal Ollama smoke test:
 
 ```bash
 ollama pull llama3.1
-python -c "from nerif.agent import SimpleChatAgent; agent = SimpleChatAgent(model='ollama/llama3.1'); print(agent.chat('Reply with OK only.', max_tokens=3))"
+python -c "from nerif.model import SimpleChatModel; model = SimpleChatModel(model='ollama/llama3.1'); print(model.chat('Reply with OK only.', max_tokens=3))"
 ```
 
 ## 5. Common failure modes

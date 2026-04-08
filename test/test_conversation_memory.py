@@ -327,6 +327,27 @@ def test_integration_reset_clears_memory():
     assert mem._summary is None
 
 
+def test_model_uses_summary_message_in_requests():
+    mem = ConversationMemory(max_messages=4, summarize=True)
+    model = SimpleChatModel(model="gpt-4o", default_prompt="You are helpful.", memory=mem)
+
+    with patch("nerif.memory.conversation.get_model_response", return_value=_make_mock_response("summary text")):
+        for i in range(6):
+            mem.add_message("user", f"msg {i}")
+            mem.add_message("assistant", f"reply {i}")
+
+    with (
+        patch("nerif.memory.conversation.get_model_response", return_value=_make_mock_response("summary text")),
+        patch("nerif.model.model.get_model_response", return_value=_make_mock_response("ok")) as mock_call,
+    ):
+        result = model.chat("next question", append=True)
+
+    assert result == "ok"
+    sent_messages = mock_call.call_args[0][0]
+    assert sent_messages[0]["role"] == "system"
+    assert "Previous conversation summary:" in sent_messages[0]["content"]
+
+
 # ---------------------------------------------------------------------------
 # Backward compatibility: no memory
 # ---------------------------------------------------------------------------

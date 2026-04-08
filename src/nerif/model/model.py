@@ -17,7 +17,7 @@ from ..utils import (
     get_model_response_stream_async,
     get_response,
 )
-from ..utils.callbacks import CallbackManager, LLMEndEvent, LLMErrorEvent, LLMStartEvent
+from ..utils.callbacks import CallbackManager, FallbackEvent, LLMEndEvent, LLMErrorEvent, LLMStartEvent
 from ..utils.fallback import FallbackConfig
 from ..utils.rate_limit import RateLimiter
 from ..utils.retry import RetryConfig
@@ -143,6 +143,10 @@ class SimpleChatModel:
         self.retry_config = retry_config
         self.memory = memory
         self.callbacks = callbacks
+        if self.counter is not None:
+            self.counter.callbacks = callbacks
+        if self.memory is not None:
+            self.memory.callbacks = callbacks
         self.rate_limiter = rate_limiter
         self.fallback_config = None
         if fallback:
@@ -180,7 +184,8 @@ class SimpleChatModel:
         if self.fallback_config is None:
             return call_fn(**kwargs)
         last_exception = None
-        for model_name in self.fallback_config.models:
+        models = self.fallback_config.models
+        for index, model_name in enumerate(models):
             try:
                 kwargs["model"] = model_name
                 return call_fn(**kwargs)
@@ -189,6 +194,8 @@ class SimpleChatModel:
                 if not self.fallback_config.should_fallback(e):
                     raise
                 LOGGER.warning("Model %s failed, trying next fallback: %s", model_name, e)
+                if index + 1 < len(models):
+                    self._emit_fallback_event(model_name, models[index + 1], e)
         raise last_exception
 
     async def _call_with_fallback_async(self, call_fn, kwargs):
@@ -196,7 +203,8 @@ class SimpleChatModel:
         if self.fallback_config is None:
             return await call_fn(**kwargs)
         last_exception = None
-        for model_name in self.fallback_config.models:
+        models = self.fallback_config.models
+        for index, model_name in enumerate(models):
             try:
                 kwargs["model"] = model_name
                 return await call_fn(**kwargs)
@@ -205,7 +213,29 @@ class SimpleChatModel:
                 if not self.fallback_config.should_fallback(e):
                     raise
                 LOGGER.warning("Model %s failed, trying next fallback: %s", model_name, e)
+                if index + 1 < len(models):
+                    self._emit_fallback_event(model_name, models[index + 1], e)
         raise last_exception
+
+    def _emit_fallback_event(self, failed_model: str, next_model: str, error: Exception) -> None:
+        if self.callbacks:
+            self.callbacks.fire(
+                "on_fallback",
+                FallbackEvent(
+                    failed_model=failed_model,
+                    next_model=next_model,
+                    error=error,
+                ),
+            )
+
+    def _response_cost_usd(self, result, model_name: str) -> float:
+        usage = getattr(result, "usage", None)
+        prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+        if self.counter is not None:
+            return self.counter._calculate_cost(model_name, prompt_tokens, completion_tokens)
+        temp_counter = NerifTokenCounter()
+        return temp_counter._calculate_cost(model_name, prompt_tokens, completion_tokens)
 
     def _prepare_chat_kwargs(self, message, max_tokens, tools, tool_choice, response_format, response_model):
         """Build message and kwargs for chat/achat. Appends user message to history."""
@@ -242,7 +272,14 @@ class SimpleChatModel:
             kwargs["response_format"] = response_format
         if self.retry_config is not None:
             kwargs["retry_config"] = self.retry_config
+        if self.callbacks is not None:
+            kwargs["callbacks"] = self.callbacks
         return kwargs
+
+    def _request_messages(self) -> List[Any]:
+        if self.memory is not None:
+            return self.memory.get_messages()
+        return self.messages
 
     def _process_chat_result(self, result, append, response_model=None):
         """Process API result: handle tool calls, history, response_model parsing."""
@@ -300,7 +337,7 @@ class SimpleChatModel:
         """Send a message and get a response."""
         kwargs = self._prepare_chat_kwargs(message, max_tokens, tools, tool_choice, response_format, response_model)
 
-        LOGGER.debug("requested with message: %s", self.messages)
+        LOGGER.debug("requested with message: %s", self._request_messages())
         LOGGER.debug("arguments of request: %s", kwargs)
 
         llm_start_time = _time.time()
@@ -309,7 +346,7 @@ class SimpleChatModel:
                 "on_llm_start",
                 LLMStartEvent(
                     model=kwargs["model"],
-                    messages=list(self.messages),
+                    messages=list(self._request_messages()),
                     timestamp=llm_start_time,
                     kwargs=kwargs,
                 ),
@@ -319,7 +356,7 @@ class SimpleChatModel:
             self.rate_limiter.acquire()
 
         try:
-            result = self._call_with_fallback(lambda **kw: get_model_response(self.messages, **kw), kwargs)
+            result = self._call_with_fallback(lambda **kw: get_model_response(self._request_messages(), **kw), kwargs)
         except Exception as e:
             if self.rate_limiter is not None:
                 self.rate_limiter.release()
@@ -347,7 +384,7 @@ class SimpleChatModel:
                     latency_ms=(_time.time() - llm_start_time) * 1000,
                     prompt_tokens=getattr(getattr(result, "usage", None), "prompt_tokens", 0) or 0,
                     completion_tokens=getattr(getattr(result, "usage", None), "completion_tokens", 0) or 0,
-                    cost_usd=0.0,
+                    cost_usd=self._response_cost_usd(result, getattr(result, "model", kwargs["model"])),
                 ),
             )
 
@@ -389,7 +426,7 @@ class SimpleChatModel:
             kwargs["retry_config"] = self.retry_config
 
         full_response = []
-        for chunk in get_model_response_stream(self.messages, **kwargs):
+        for chunk in get_model_response_stream(self._request_messages(), **kwargs):
             if chunk.content:
                 full_response.append(chunk.content)
                 yield chunk.content
@@ -417,7 +454,7 @@ class SimpleChatModel:
         """Async version of chat()."""
         kwargs = self._prepare_chat_kwargs(message, max_tokens, tools, tool_choice, response_format, response_model)
 
-        LOGGER.debug("requested with message: %s", self.messages)
+        LOGGER.debug("requested with message: %s", self._request_messages())
         LOGGER.debug("arguments of request: %s", kwargs)
 
         llm_start_time = _time.time()
@@ -426,7 +463,7 @@ class SimpleChatModel:
                 "on_llm_start",
                 LLMStartEvent(
                     model=kwargs["model"],
-                    messages=list(self.messages),
+                    messages=list(self._request_messages()),
                     timestamp=llm_start_time,
                     kwargs=kwargs,
                 ),
@@ -437,7 +474,7 @@ class SimpleChatModel:
 
         try:
             result = await self._call_with_fallback_async(
-                lambda **kw: get_model_response_async(self.messages, **kw), kwargs
+                lambda **kw: get_model_response_async(self._request_messages(), **kw), kwargs
             )
         except Exception as e:
             if self.rate_limiter is not None:
@@ -466,7 +503,7 @@ class SimpleChatModel:
                     latency_ms=(_time.time() - llm_start_time) * 1000,
                     prompt_tokens=getattr(getattr(result, "usage", None), "prompt_tokens", 0) or 0,
                     completion_tokens=getattr(getattr(result, "usage", None), "completion_tokens", 0) or 0,
-                    cost_usd=0.0,
+                    cost_usd=self._response_cost_usd(result, getattr(result, "model", kwargs["model"])),
                 ),
             )
 
@@ -488,6 +525,8 @@ class SimpleChatModel:
             kwargs["tool_choice"] = tool_choice
         if self.retry_config is not None:
             kwargs["retry_config"] = self.retry_config
+        if self.callbacks is not None:
+            kwargs["callbacks"] = self.callbacks
 
         llm_start_time = _time.time()
         if self.callbacks:
@@ -495,7 +534,7 @@ class SimpleChatModel:
                 "on_llm_start",
                 LLMStartEvent(
                     model=kwargs["model"],
-                    messages=list(self.messages),
+                    messages=list(self._request_messages()),
                     timestamp=llm_start_time,
                     kwargs=kwargs,
                 ),
@@ -505,7 +544,7 @@ class SimpleChatModel:
             self.rate_limiter.acquire()
 
         try:
-            result = self._call_with_fallback(lambda **kw: get_model_response(self.messages, **kw), kwargs)
+            result = self._call_with_fallback(lambda **kw: get_model_response(self._request_messages(), **kw), kwargs)
         except Exception as e:
             if self.rate_limiter is not None:
                 self.rate_limiter.release()
@@ -533,7 +572,7 @@ class SimpleChatModel:
                     latency_ms=(_time.time() - llm_start_time) * 1000,
                     prompt_tokens=getattr(getattr(result, "usage", None), "prompt_tokens", 0) or 0,
                     completion_tokens=getattr(getattr(result, "usage", None), "completion_tokens", 0) or 0,
-                    cost_usd=0.0,
+                    cost_usd=self._response_cost_usd(result, getattr(result, "model", kwargs["model"])),
                 ),
             )
 
@@ -551,6 +590,8 @@ class SimpleChatModel:
             kwargs["tool_choice"] = tool_choice
         if self.retry_config is not None:
             kwargs["retry_config"] = self.retry_config
+        if self.callbacks is not None:
+            kwargs["callbacks"] = self.callbacks
 
         llm_start_time = _time.time()
         if self.callbacks:
@@ -558,7 +599,7 @@ class SimpleChatModel:
                 "on_llm_start",
                 LLMStartEvent(
                     model=kwargs["model"],
-                    messages=list(self.messages),
+                    messages=list(self._request_messages()),
                     timestamp=llm_start_time,
                     kwargs=kwargs,
                 ),
@@ -569,7 +610,7 @@ class SimpleChatModel:
 
         try:
             result = await self._call_with_fallback_async(
-                lambda **kw: get_model_response_async(self.messages, **kw), kwargs
+                lambda **kw: get_model_response_async(self._request_messages(), **kw), kwargs
             )
         except Exception as e:
             if self.rate_limiter is not None:
@@ -598,7 +639,7 @@ class SimpleChatModel:
                     latency_ms=(_time.time() - llm_start_time) * 1000,
                     prompt_tokens=getattr(getattr(result, "usage", None), "prompt_tokens", 0) or 0,
                     completion_tokens=getattr(getattr(result, "usage", None), "completion_tokens", 0) or 0,
-                    cost_usd=0.0,
+                    cost_usd=self._response_cost_usd(result, getattr(result, "model", kwargs["model"])),
                 ),
             )
 
@@ -637,7 +678,7 @@ class SimpleChatModel:
             kwargs["retry_config"] = self.retry_config
 
         full_response = []
-        async for chunk in get_model_response_stream_async(self.messages, **kwargs):
+        async for chunk in get_model_response_stream_async(self._request_messages(), **kwargs):
             if chunk.content:
                 full_response.append(chunk.content)
                 yield chunk.content

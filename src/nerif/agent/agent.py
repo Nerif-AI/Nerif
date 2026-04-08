@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..memory import ConversationMemory, SharedMemory
 from ..model.model import SimpleChatModel, ToolCallResult
+from ..utils.callbacks import ToolCallEvent
 from ..utils.constants import LOGGER_NAME
 from .state import AgentResult, AgentState, TokenUsage, ToolCallRecord
 from .tool import Tool
@@ -113,41 +114,81 @@ class NerifAgent:
         )
 
     def _execute_tool_call(self, tool_call: ToolCallResult) -> str:
+        started_at = time.perf_counter()
         tool = self.tools.get(tool_call.name)
         if tool is None:
-            return json.dumps({"error": f"Tool '{tool_call.name}' not found"})
+            result = json.dumps({"error": f"Tool '{tool_call.name}' not found"})
+            self._emit_tool_call_event(tool_call.name, {}, result, (time.perf_counter() - started_at) * 1000, False)
+            return result
 
         try:
             args = json.loads(tool_call.arguments)
         except json.JSONDecodeError:
-            return json.dumps({"error": f"Invalid JSON arguments: {tool_call.arguments}"})
+            result = json.dumps({"error": f"Invalid JSON arguments: {tool_call.arguments}"})
+            self._emit_tool_call_event(tool_call.name, {}, result, (time.perf_counter() - started_at) * 1000, False)
+            return result
 
         try:
-            result = tool.execute(**args)
-            if isinstance(result, str):
-                return result
-            return json.dumps(result, default=str)
+            tool_result = tool.execute(**args)
+            if isinstance(tool_result, str):
+                result = tool_result
+            else:
+                result = json.dumps(tool_result, default=str)
+            self._emit_tool_call_event(tool_call.name, args, result, (time.perf_counter() - started_at) * 1000, True)
+            return result
         except Exception as e:
-            return json.dumps({"error": str(e)})
+            result = json.dumps({"error": str(e)})
+            self._emit_tool_call_event(tool_call.name, args, result, (time.perf_counter() - started_at) * 1000, False)
+            return result
 
     async def _execute_tool_call_async(self, tool_call: ToolCallResult) -> str:
         """Like _execute_tool_call but awaits async tools."""
+        started_at = time.perf_counter()
         tool = self.tools.get(tool_call.name)
         if tool is None:
-            return json.dumps({"error": f"Tool '{tool_call.name}' not found"})
+            result = json.dumps({"error": f"Tool '{tool_call.name}' not found"})
+            self._emit_tool_call_event(tool_call.name, {}, result, (time.perf_counter() - started_at) * 1000, False)
+            return result
 
         try:
             args = json.loads(tool_call.arguments)
         except json.JSONDecodeError:
-            return json.dumps({"error": f"Invalid JSON arguments: {tool_call.arguments}"})
+            result = json.dumps({"error": f"Invalid JSON arguments: {tool_call.arguments}"})
+            self._emit_tool_call_event(tool_call.name, {}, result, (time.perf_counter() - started_at) * 1000, False)
+            return result
 
         try:
-            result = await tool.aexecute(**args)
-            if isinstance(result, str):
-                return result
-            return json.dumps(result, default=str)
+            tool_result = await tool.aexecute(**args)
+            if isinstance(tool_result, str):
+                result = tool_result
+            else:
+                result = json.dumps(tool_result, default=str)
+            self._emit_tool_call_event(tool_call.name, args, result, (time.perf_counter() - started_at) * 1000, True)
+            return result
         except Exception as e:
-            return json.dumps({"error": str(e)})
+            result = json.dumps({"error": str(e)})
+            self._emit_tool_call_event(tool_call.name, args, result, (time.perf_counter() - started_at) * 1000, False)
+            return result
+
+    def _emit_tool_call_event(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        result: str,
+        latency_ms: float,
+        success: bool,
+    ) -> None:
+        if self.callbacks:
+            self.callbacks.fire(
+                "on_tool_call",
+                ToolCallEvent(
+                    tool_name=tool_name,
+                    arguments=arguments,
+                    result=result,
+                    latency_ms=latency_ms,
+                    success=success,
+                ),
+            )
 
     def snapshot(self) -> AgentState:
         memory_state = None
@@ -190,11 +231,33 @@ class NerifAgent:
         if state.memory_state is not None:
             if self.model.memory is None:
                 self.model.memory = ConversationMemory()
+                self.model.memory.callbacks = self.callbacks
             self.model.memory.restore(state.memory_state)
             self.model.messages = self.model.memory._messages
         else:
             self.model.memory = None
             self.model.messages = deepcopy(state.messages)
+
+    def _maybe_start_span(self, name: str):
+        """Start a tracing span if a TraceCollector is active. Returns context or None."""
+        try:
+            from ..observability.tracing import SpanKind, _current_collector, start_span
+
+            if _current_collector.get() is not None:
+                return start_span(name, SpanKind.AGENT)
+        except ImportError:
+            pass
+        return None
+
+    def _maybe_end_span(self, ctx, error=None):
+        """End a tracing span if one was started."""
+        if ctx is not None:
+            try:
+                from ..observability.tracing import end_span
+
+                end_span(ctx, error=error)
+            except ImportError:
+                pass
 
     def run(self, message: str) -> AgentResult:
         """
@@ -203,6 +266,17 @@ class NerifAgent:
         The agent will loop through tool calls until it produces a text response
         or hits max_iterations.
         """
+        span_ctx = self._maybe_start_span(f"agent:{self.model.model}")
+        error = None
+        try:
+            return self._run_inner(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            self._maybe_end_span(span_ctx, error=error)
+
+    def _run_inner(self, message: str) -> AgentResult:
         tool_dicts = self._get_tool_dicts() if self.tools else None
         total_usage = TokenUsage()
         all_tool_calls: List[ToolCallRecord] = []
@@ -254,6 +328,17 @@ class NerifAgent:
         When multiple tool calls are returned in a single response,
         they are executed concurrently via asyncio.gather().
         """
+        span_ctx = self._maybe_start_span(f"agent:{self.model.model}")
+        error = None
+        try:
+            return await self._arun_inner(message)
+        except Exception as e:
+            error = e
+            raise
+        finally:
+            self._maybe_end_span(span_ctx, error=error)
+
+    async def _arun_inner(self, message: str) -> AgentResult:
         tool_dicts = self._get_tool_dicts() if self.tools else None
         total_usage = TokenUsage()
         all_tool_calls: List[ToolCallRecord] = []

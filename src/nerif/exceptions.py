@@ -50,3 +50,10 @@ class ModelNotFoundError(ConfigError):
 
 class TokenLimitError(NerifError):
     """Request exceeds model's token limit."""
+
+
+# Re-export from observability for discoverability
+try:
+    from nerif.observability.budget import BudgetExceededError  # noqa: F401
+except ImportError:
+    pass

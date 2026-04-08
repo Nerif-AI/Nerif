@@ -404,7 +404,7 @@ class TestResponseModelAsync:
                 assert result.name == "AsyncWidget"
                 assert result.value == 99
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_achat_without_model_returns_string(self):
         async def run():
@@ -415,7 +415,7 @@ class TestResponseModelAsync:
                 assert isinstance(result, str)
                 assert result == "Just async text"
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_achat_nested_model(self):
         async def run():
@@ -427,7 +427,7 @@ class TestResponseModelAsync:
                 assert isinstance(result, PersonWithAddress)
                 assert result.address.city == "PDX"
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------

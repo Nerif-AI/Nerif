@@ -4,109 +4,68 @@ sidebar_position: 3
 
 # Nerif Token Counter
 
-Counting token consumed by specific model or request method like `nerif()`
+`NerifTokenCounter` tracks token usage and also exposes lightweight observability metrics such as latency, estimated cost, success rate, retry counts, and export helpers.
 
-## Basic Usage
-
-A counter should be create seperately, and pass it into constructor of model class or special methods.
+## Basic usage
 
 ```python
-from nerif.model import NerifTokenCounter, SimpleChatModel
-from nerif.core import nerif
+from nerif.model import SimpleChatModel
+from nerif.utils import NerifTokenCounter
 
 counter = NerifTokenCounter()
+model = SimpleChatModel(model="gpt-4o", counter=counter)
 
-if nerif("the sky is blue", counter=counter):
-    print("True")
-
-model = SimpleChatModel(counter=counter)
-
-print(counter.model_token)
+response = model.chat("Explain tracing in one sentence.")
+print(response)
+print(counter.summary())
+print(counter.to_dict())
 ```
 
-## Classes
+## What it tracks
+
+- input/output tokens per model
+- average latency per model
+- successful and failed request counts
+- retry counts
+- estimated USD cost using built-in pricing
+
+## Useful methods
+
+- `count_from_response(response)`
+- `record_request(...)`
+- `record_retry(model)`
+- `avg_latency(model=None)`
+- `success_rate(model=None)`
+- `total_cost()`
+- `summary()`
+- `to_dict()`
+- `to_json()`
+- `reset_stats()`
+
+## Request callbacks
+
+`NerifTokenCounter` can also emit request lifecycle callbacks:
+
+- `on_request_start`
+- `on_request_end`
+- `on_error`
+
+These are separate from the higher-level `CallbackManager` event system used by models and agents.
+
+## Core classes
 
 ### `NerifTokenCounter`
-
-A class to count the token consumed by specific Model or method.
-
-Attributes:
-
-- `response_parser (ResponseParserBase)`: Parser for response from llm backend, default: `OpenAIResponseParser()`
-
-Methods:
-
-- `set_parser(parser=ResponseParserBase)`: Set response parser to specific parser.
-- `set_parser_based_on_model(self, model_name=str)`: Set response parser from name of model.
-- `count_from_response(response=any)`: Counting tokens consumed by the model from response.
-
-Example:
-
-```python
-from nerif.model import NerifTokenCounter, SimpleChatModel
-from nerif.core import nerif
-
-counter = NerifTokenCounter()
-
-if nerif("the sky is blue", counter=counter):
-    print("True")
-
-model = SimpleChatModel(counter=counter)
-
-print(counter.model_token)
-
-```
+Main counter class.
 
 ### `ResponseParserBase`
+Base parser for extracting token usage from provider responses.
 
-Base class of response parser.
-
-Methods:
-
-- `__call__(response=any) -> ModelCost`: Parse token usage from response.
-
-Derived Classes:
-
-- `OpenAIResponseParser`: Parser for OpenAI compatible API.
-- `OllamaResponseParser`: Parser for Ollama API.
-
-### `NerifTokenConsume`
-
-:::warning
-
-Do not use this class directly, plase use `NerifTokenCounter`
-
-:::
-
-Attributes: 
-
-- `model_cost (dict{str: ModelCost})`: A dict to store model name and `ModelCost`.
-
-Methods:
-
-- `__getitem__(key=str) -> ModelCost`: Get `ModelCost` from internal dict.
-- `append(consume=ModelCost)`: Append cost information.
-- `__repr__() -> str`: Prettyprint cost information.
-
+Derived classes:
+- `OpenAIResponseParser`
+- `OllamaResponseParser`
 
 ### `ModelCost`
+Stores input/output token totals for a model.
 
-:::warning
-
-Do not use this class directly, plase use `NerifTokenCounter`
-
-:::
-
-A class to store token consumed by specific model.
-
-Attributes:
-
-- `model_name (str)`: The name of model.
-- `request (int)`: The count of token in request.
-- `response (int)`: The count of token in response.
-
-Methods:
-
-- `add_cost(request=int, response=None|int)`: Append token usage.
-
-
+### `NerifTokenConsume`
+Internal container for aggregated model costs.
