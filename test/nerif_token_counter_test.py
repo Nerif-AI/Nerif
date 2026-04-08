@@ -12,10 +12,9 @@ OPENAI_TEST_MODEL = "gpt-4o-mini"
 
 _RUN_LIVE = bool(os.environ.get("NERIF_RUN_LIVE_TESTS"))
 
-_RUN_LIVE = bool(os.environ.get("NERIF_RUN_LIVE_TESTS"))
-
 
 class TestTokenCounter(unittest.TestCase):
+    @unittest.skipUnless(_RUN_LIVE, "NERIF_RUN_LIVE_TESTS not set — skipping live API tests")
     def test_counting_completion_raw(self):
         counter = NerifTokenCounter()
         response = get_model_response(

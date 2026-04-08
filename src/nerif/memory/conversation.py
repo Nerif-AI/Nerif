@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 from ..utils import get_model_response
+from ..utils.callbacks import MemoryEvent
 
 DEFAULT_SUMMARY_PROMPT = "Summarize the following conversation concisely, preserving key facts and context:"
 
@@ -93,6 +94,7 @@ class ConversationMemory:
         self.summarize_model = summarize_model
         self.summary_prompt = summary_prompt if summary_prompt is not None else DEFAULT_SUMMARY_PROMPT
         self.counter = counter
+        self.callbacks = None
         self.shared_memory = shared_memory or SharedMemory()
         self.namespace = namespace
 
@@ -123,6 +125,19 @@ class ConversationMemory:
         metadata = self.shared_memory.metadata(self.namespace)
         metadata.clear()
         metadata.update(value)
+
+    def _emit_memory_event(self, action: str, messages_before: int, messages_after: int, summary: Optional[str] = None) -> None:
+        callbacks = self.callbacks or getattr(self.counter, "callbacks", None)
+        if callbacks is not None:
+            callbacks.fire(
+                "on_memory",
+                MemoryEvent(
+                    action=action,
+                    messages_before=messages_before,
+                    messages_after=messages_after,
+                    summary=summary,
+                ),
+            )
 
     def add_message(self, role: str, content: Any) -> None:
         """Append a message and trigger window management."""
@@ -178,21 +193,26 @@ class ConversationMemory:
             non_system = [m for m in self._messages if m["role"] != "system"]
             if len(non_system) <= self.max_messages:
                 break
+            messages_before = len(self._messages)
             # Find and remove the first non-system message
             for i, msg in enumerate(self._messages):
                 if msg["role"] != "system":
                     self._messages.pop(i)
+                    self._emit_memory_event("drop_oldest", messages_before, len(self._messages))
                     break
 
     def _drop_oldest_single(self) -> None:
         """Drop a single oldest non-system message."""
+        messages_before = len(self._messages)
         for i, msg in enumerate(self._messages):
             if msg["role"] != "system":
                 self._messages.pop(i)
+                self._emit_memory_event("drop_oldest_single", messages_before, len(self._messages))
                 break
 
     def _summarize_oldest(self) -> None:
         """Summarize the oldest 50% of non-system messages (minimum 2)."""
+        messages_before = len(self._messages)
         non_system = [m for m in self._messages if m["role"] != "system"]
         count = len(non_system)
         # Summarize at least 2 and at most 50% of non-system messages
@@ -253,6 +273,8 @@ class ConversationMemory:
         # Remove summarized messages from _messages (in reverse index order)
         for i in reversed(indices_to_remove):
             self._messages.pop(i)
+
+        self._emit_memory_event("summarize", messages_before, len(self._messages), summary=new_summary)
 
     def _estimate_tokens(self, message: Dict[str, Any]) -> int:
         """Estimate token count for a single message."""

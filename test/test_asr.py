@@ -83,7 +83,7 @@ class TestAudioModelEnhanced:
                 result = await model.atranscribe(file=("test.wav", b"data"))
                 assert result == {"text": "async hello"}
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_atranslate(self):
         model = AudioModel(api_key="k", base_url="http://test/v1")
@@ -98,7 +98,7 @@ class TestAudioModelEnhanced:
                 result = await model.atranslate(file=("test.wav", b"data"))
                 assert result == {"text": "translated"}
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
 
 class TestTranscriber:
@@ -122,7 +122,7 @@ class TestTranscriber:
                 result = await t.atranscribe(file=("f", b"d"))
                 assert result == "async hello"
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_empty_response(self):
         t = Transcriber(api_key="k", base_url="http://test/v1")

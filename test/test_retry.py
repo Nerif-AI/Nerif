@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
+from nerif.utils.callbacks import CallbackHandler, CallbackManager
 from nerif.utils.retry import (
     AGGRESSIVE_RETRY,
     DEFAULT_RETRY,
@@ -14,9 +15,13 @@ from nerif.utils.retry import (
     retry_sync,
 )
 
-# ---------------------------------------------------------------------------
-# RetryConfig: defaults and delay calculation
-# ---------------------------------------------------------------------------
+
+class _RetryRecordingHandler(CallbackHandler):
+    def __init__(self):
+        self.events = []
+
+    def on_retry(self, event):
+        self.events.append(event)
 
 
 def test_retry_config_defaults():
@@ -287,9 +292,25 @@ def test_retry_sync_uses_default_retry_when_none(mock_sleep):
     assert call_count == 2
 
 
-# ---------------------------------------------------------------------------
-# retry_async
-# ---------------------------------------------------------------------------
+@patch("nerif.utils.retry.time.sleep")
+def test_retry_sync_emits_retry_event(mock_sleep):
+    handler = _RetryRecordingHandler()
+    callbacks = CallbackManager()
+    callbacks.add_handler(handler)
+    call_count = 0
+
+    def func():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise _make_status_error(503)
+        return "ok"
+
+    result = retry_sync(func, retry_config=RetryConfig(max_retries=1, jitter=False), model="gpt-4o", callbacks=callbacks)
+    assert result == "ok"
+    assert len(handler.events) == 1
+    assert handler.events[0].model == "gpt-4o"
+    assert handler.events[0].attempt == 1
 
 
 @pytest.mark.asyncio

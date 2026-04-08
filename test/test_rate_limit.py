@@ -51,7 +51,7 @@ class TestRateLimiterAsync:
             await limiter.aacquire()
             limiter.arelease()
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
     def test_async_interval(self):
         limiter = RateLimiter(RateLimitConfig(requests_per_second=20.0))
@@ -65,7 +65,7 @@ class TestRateLimiterAsync:
             limiter.arelease()
             assert elapsed >= 0.03
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
 
 
 class TestRateLimiterRegistry:

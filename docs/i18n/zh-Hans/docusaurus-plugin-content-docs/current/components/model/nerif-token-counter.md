@@ -4,107 +4,68 @@ sidebar_position: 3
 
 # Nerif Token 计数器
 
-统计特定模型或请求方法（如 `nerif()`）消耗的 token 数量。
+`NerifTokenCounter` 不仅统计 token，还提供轻量级可观测性指标，例如延迟、估算成本、成功率、重试次数和导出接口。
 
 ## 基本用法
 
-计数器需要单独创建，然后传入模型类的构造函数或特定方法中。
-
 ```python
-from nerif.model import NerifTokenCounter, SimpleChatModel
-from nerif.core import nerif
+from nerif.model import SimpleChatModel
+from nerif.utils import NerifTokenCounter
 
 counter = NerifTokenCounter()
+model = SimpleChatModel(model="gpt-4o", counter=counter)
 
-if nerif("the sky is blue", counter=counter):
-    print("True")
-
-model = SimpleChatModel(counter=counter)
-
-print(counter.model_token)
+response = model.chat("Explain tracing in one sentence.")
+print(response)
+print(counter.summary())
+print(counter.to_dict())
 ```
 
-## 类
+## 可追踪内容
+
+- 每个模型的输入/输出 token
+- 每个模型的平均延迟
+- 成功/失败请求数量
+- 重试次数
+- 基于内置价格表计算的估算美元成本
+
+## 常用方法
+
+- `count_from_response(response)`
+- `record_request(...)`
+- `record_retry(model)`
+- `avg_latency(model=None)`
+- `success_rate(model=None)`
+- `total_cost()`
+- `summary()`
+- `to_dict()`
+- `to_json()`
+- `reset_stats()`
+
+## 请求回调
+
+`NerifTokenCounter` 还支持请求生命周期回调：
+
+- `on_request_start`
+- `on_request_end`
+- `on_error`
+
+这些回调与模型/agent 使用的 `CallbackManager` 事件系统是分开的。
+
+## 核心类
 
 ### `NerifTokenCounter`
-
-用于统计特定模型或方法消耗的 token 数量的类。
-
-属性：
-
-- `response_parser (ResponseParserBase)`：LLM 后端响应的解析器，默认值：`OpenAIResponseParser()`
-
-方法：
-
-- `set_parser(parser=ResponseParserBase)`：设置特定的响应解析器。
-- `set_parser_based_on_model(self, model_name=str)`：根据模型名称设置响应解析器。
-- `count_from_response(response=any)`：从响应中统计模型消耗的 token 数量。
-
-示例：
-
-```python
-from nerif.model import NerifTokenCounter, SimpleChatModel
-from nerif.core import nerif
-
-counter = NerifTokenCounter()
-
-if nerif("the sky is blue", counter=counter):
-    print("True")
-
-model = SimpleChatModel(counter=counter)
-
-print(counter.model_token)
-
-```
+主计数器类。
 
 ### `ResponseParserBase`
-
-响应解析器的基类。
-
-方法：
-
-- `__call__(response=any) -> ModelCost`：从响应中解析 token 使用量。
+用于从 provider 响应中提取 token 使用量的基类。
 
 派生类：
-
-- `OpenAIResponseParser`：用于 OpenAI 兼容 API 的解析器。
-- `OllamaResponseParser`：用于 Ollama API 的解析器。
-
-### `NerifTokenConsume`
-
-:::warning
-
-请勿直接使用此类，请使用 `NerifTokenCounter`
-
-:::
-
-属性：
-
-- `model_cost (dict{str: ModelCost})`：存储模型名称和 `ModelCost` 的字典。
-
-方法：
-
-- `__getitem__(key=str) -> ModelCost`：从内部字典获取 `ModelCost`。
-- `append(consume=ModelCost)`：追加费用信息。
-- `__repr__() -> str`：格式化输出费用信息。
-
+- `OpenAIResponseParser`
+- `OllamaResponseParser`
 
 ### `ModelCost`
+存储单个模型的输入/输出 token 总量。
 
-:::warning
-
-请勿直接使用此类，请使用 `NerifTokenCounter`
-
-:::
-
-用于存储特定模型消耗的 token 的类。
-
-属性：
-
-- `model_name (str)`：模型名称。
-- `request (int)`：请求中的 token 数量。
-- `response (int)`：响应中的 token 数量。
-
-方法：
-
-- `add_cost(request=int, response=None|int)`：追加 token 使用量。
+### `NerifTokenConsume`
+内部使用的聚合容器。

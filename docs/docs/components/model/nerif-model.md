@@ -8,216 +8,76 @@ sidebar_position: 1
 
 ### SimpleChatModel
 
-The main model class in Nerif. Supports text and multi-modal input (images, audio, video) as well as tool calling and structured output (JSON mode).
+The main chat model class in Nerif. It supports text and multi-modal input, tool calling, structured output, retry, fallback, callbacks, rate limiting, and optional conversation memory.
 
-Attributes:
-
-- `model (str)`: The name of the model to use (default: `NERIF_DEFAULT_LLM_MODEL`).
-- `default_prompt (str)`: The default system prompt for the chat.
-- `temperature (float)`: The temperature setting for response generation.
-- `counter (NerifTokenCounter)`: Token counter instance.
-- `messages (List[Any])`: The conversation history.
-- `max_tokens (int)`: The maximum number of tokens to generate in the response.
-- `retry_config (RetryConfig)`: Retry strategy for API calls.
-
-Methods:
-
-- `reset(prompt=None)`: Resets the conversation history. Optionally sets a new system prompt.
-- `set_max_tokens(max_tokens=None|int)`: Sets the maximum tokens limit.
-- `chat(message, append=False, max_tokens=None, tools=None, tool_choice=None, response_format=None)`: Sends a message and gets a response.
-- `stream_chat(message, append=False, max_tokens=None, response_format=None)`: Stream response tokens.
-- `achat(message, append=False, max_tokens=None, tools=None, tool_choice=None, response_format=None, response_model=None)`: Async version of chat().
-- `astream_chat(message, append=False, max_tokens=None, response_format=None)`: Async streaming.
-
-Init:
-
-```python
-def __init__(
-    self,
-    model: str = NERIF_DEFAULT_LLM_MODEL,
-    default_prompt: str = "You are a helpful assistant. You can help me by answering my questions.",
-    temperature: float = 0.0,
-    counter: NerifTokenCounter = None,
-    max_tokens: None | int = None,
-    retry_config: RetryConfig = None,  # NEW
-)
-```
-
-#### `chat()` Method
-
-```python
-def chat(
-    self,
-    message: Union[str, MultiModalMessage],
-    append: bool = False,
-    max_tokens: None | int = None,
-    tools: Optional[List[Union[Dict, ToolDefinition]]] = None,
-    tool_choice: Optional[Any] = None,
-    response_format: Optional[Any] = None,
-    response_model: Optional[Any] = None,  # NEW
-) -> Union[str, List[ToolCallResult], BaseModel]:
-```
-
-**Parameters:**
-- `message`: Text string or `MultiModalMessage` for multi-modal input.
-- `append`: If `True`, keep conversation history; if `False`, reset after response.
-- `max_tokens`: Override max tokens for this request.
-- `tools`: List of tool definitions for function calling (see [Tool Calling](#tool-calling)).
-- `tool_choice`: Tool choice parameter (e.g. `"auto"`, `"none"`, or a specific tool).
-- `response_format`: Response format (e.g. `{"type": "json_object"}` for JSON mode).
-
-**Returns:** Text response string, or `List[ToolCallResult]` if tools were called.
-
-Example:
+### Constructor
 
 ```python
 from nerif.model import SimpleChatModel
 
-model = SimpleChatModel()
-
-print(model.chat("What is the capital of the moon?"))
-print(model.chat("What is the capital of the moon?", max_tokens=10))
+model = SimpleChatModel(
+    model="gpt-4o",
+    default_prompt="You are a helpful assistant.",
+    temperature=0.0,
+    counter=None,
+    max_tokens=None,
+    retry_config=None,
+    memory=None,
+    fallback=None,
+    callbacks=None,
+    rate_limiter=None,
+)
 ```
 
----
+### Key methods
+
+- `chat(...)`
+- `achat(...)`
+- `stream_chat(...)`
+- `astream_chat(...)`
+- `reset(prompt=None)`
+- `set_max_tokens(max_tokens=None)`
+
+### `chat()`
+
+```python
+result = model.chat(
+    "Summarize this message.",
+    append=True,
+    tools=None,
+    tool_choice=None,
+    response_format=None,
+    response_model=None,
+)
+```
+
+Returns either:
+- `str`
+- `list[ToolCallResult]`
+- a validated Pydantic model when `response_model=` is used
+
+### Memory, fallback, and callbacks
+
+- `memory=ConversationMemory(...)` enables managed conversation history
+- `fallback=[...]` enables automatic model fallback on transient failures
+- `callbacks=CallbackManager()` enables LLM, tool, retry, fallback, and memory event hooks
+- `rate_limiter=RateLimiter(...)` enables request throttling
 
 ### MultiModalMessage
 
-Helper class for building multi-modal messages with text, images, audio, and video. Uses a fluent (chainable) API.
+Use `MultiModalMessage` to build text + image/audio/video requests.
 
-Methods:
+### Tool calling
 
-- `add_text(text: str)`: Add a text part.
-- `add_image_url(url: str)`: Add an image from a URL.
-- `add_image_path(path: str)`: Add an image from a local file path (auto base64-encoded).
-- `add_image_base64(b64: str, media_type="image/jpeg")`: Add a base64-encoded image.
-- `add_audio_url(url: str)`: Add audio from a URL.
-- `add_audio_path(path: str, format="wav")`: Add audio from a local file (auto base64-encoded).
-- `add_audio_base64(b64: str, format="wav")`: Add base64-encoded audio.
-- `add_video_url(url: str)`: Add a video from a URL.
-- `add_video_path(path: str)`: Add a video from a local file (auto base64-encoded).
-- `to_content()`: Returns the list of content parts for the API.
+Use `ToolDefinition` for OpenAI-compatible tool/function calling. Tool calls return `ToolCallResult` objects.
 
-All `add_*` methods return `self`, so calls can be chained:
+### Structured output
 
-```python
-from nerif.model import SimpleChatModel, MultiModalMessage
-
-model = SimpleChatModel(model="gpt-4o")
-
-msg = (
-    MultiModalMessage()
-    .add_text("What do you see in this image?")
-    .add_image_url("https://example.com/photo.jpg")
-)
-
-result = model.chat(msg)
-print(result)
-```
-
----
-
-### Tool Calling
-
-Nerif supports OpenAI-compatible tool calling through `ToolDefinition` and `ToolCallResult`.
-
-#### ToolDefinition
-
-Helper for defining tools in OpenAI function calling format.
-
-```python
-from nerif.model import SimpleChatModel, ToolDefinition
-
-weather_tool = ToolDefinition(
-    name="get_weather",
-    description="Get the current weather for a given location",
-    parameters={
-        "type": "object",
-        "properties": {
-            "location": {
-                "type": "string",
-                "description": "The city and state, e.g. San Francisco, CA",
-            },
-        },
-        "required": ["location"],
-    },
-)
-
-model = SimpleChatModel(model="gpt-4o")
-result = model.chat(
-    "What's the weather like in San Francisco?",
-    tools=[weather_tool],
-    tool_choice="auto",
-)
-```
-
-#### ToolCallResult
-
-Represents a tool call returned by the model. Returned when the model decides to call a tool instead of generating text.
-
-Attributes:
-- `id (str)`: The unique ID for this tool call.
-- `name (str)`: The name of the function to call.
-- `arguments (str)`: JSON string of the function arguments.
-
-```python
-if isinstance(result, list):
-    for tc in result:
-        print(f"Tool: {tc.name}, Args: {tc.arguments}")
-```
-
----
-
-### Structured Output (JSON Mode)
-
-Use `response_format` to get structured JSON output from the model:
-
-```python
-from nerif.model import SimpleChatModel
-from nerif.utils import NerifFormat
-
-model = SimpleChatModel(model="gpt-4o")
-result = model.chat(
-    "List three programming languages with their year of creation. "
-    "Respond in JSON format as an array of objects with 'name' and 'year' fields.",
-    response_format={"type": "json_object"},
-)
-
-# Parse robustly with NerifFormat
-parsed = NerifFormat.json_parse(result)
-```
-
----
+Use `response_format={...}` or `response_model=MyModel` for structured responses.
 
 ### Streaming
 
-Use `stream_chat()` for real-time token-by-token output:
-
-```python
-from nerif.model import SimpleChatModel
-
-model = SimpleChatModel()
-
-for chunk in model.stream_chat("Write a haiku about coding."):
-    print(chunk, end="", flush=True)
-print()
-```
-
-### Async Support
-
-All model methods have async counterparts with `a` prefix:
-
-```python
-import asyncio
-from nerif.model import SimpleChatModel
-
-async def main():
-    model = SimpleChatModel()
-    result = await model.achat("Hello!")
-    print(result)
-
-    # Async streaming
-    async for chunk in model.astream_chat("Tell me a story."):
+Use `stream_chat()` or `astream_chat()` for incremental output.
         print(chunk, end="", flush=True)
 
 asyncio.run(main())

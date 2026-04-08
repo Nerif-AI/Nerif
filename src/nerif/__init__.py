@@ -14,6 +14,7 @@ __all__ = [
     "batch",
     "core",
     "model",
+    "observability",
     "utils",
     "NerifError",
     "ProviderError",
@@ -27,7 +28,7 @@ __all__ = [
 
 def __getattr__(name):
     """Lazy import for optional feature subpackages."""
-    if name in ("asr", "img_gen", "tts", "rag", "memory"):
+    if name in ("asr", "img_gen", "tts", "rag", "memory", "observability"):
         import importlib
 
         mod = importlib.import_module(f".{name}", __name__)

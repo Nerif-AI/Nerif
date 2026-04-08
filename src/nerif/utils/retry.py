@@ -5,6 +5,8 @@ from typing import Optional, Set
 
 import httpx
 
+from .callbacks import RetryEvent
+
 
 def _is_transient_error(exception: Exception, status_codes, on_timeout: bool) -> bool:
     """Check if an exception represents a transient error worth retrying/falling back from."""
@@ -49,7 +51,7 @@ DEFAULT_RETRY = RetryConfig()
 AGGRESSIVE_RETRY = RetryConfig(max_retries=5, base_delay=0.5)
 
 
-def retry_sync(func, *args, retry_config: Optional[RetryConfig] = None, counter=None, model="", **kwargs):
+def retry_sync(func, *args, retry_config: Optional[RetryConfig] = None, counter=None, model="", callbacks=None, **kwargs):
     """Execute a function with retry logic."""
     config = retry_config or DEFAULT_RETRY
     last_exception = None
@@ -69,13 +71,24 @@ def retry_sync(func, *args, retry_config: Optional[RetryConfig] = None, counter=
                         delay = max(delay, float(retry_after))
                     except ValueError:
                         pass
+            if callbacks is not None:
+                callbacks.fire(
+                    "on_retry",
+                    RetryEvent(
+                        model=model,
+                        attempt=attempt + 1,
+                        max_retries=config.max_retries,
+                        delay=delay,
+                        error=e,
+                    ),
+                )
             time.sleep(delay)
             if counter is not None:
                 counter.record_retry(model)
     raise last_exception
 
 
-async def retry_async(func, *args, retry_config: Optional[RetryConfig] = None, counter=None, model="", **kwargs):
+async def retry_async(func, *args, retry_config: Optional[RetryConfig] = None, counter=None, model="", callbacks=None, **kwargs):
     """Execute an async function with retry logic."""
     import asyncio
 
@@ -96,6 +109,17 @@ async def retry_async(func, *args, retry_config: Optional[RetryConfig] = None, c
                         delay = max(delay, float(retry_after))
                     except ValueError:
                         pass
+            if callbacks is not None:
+                callbacks.fire(
+                    "on_retry",
+                    RetryEvent(
+                        model=model,
+                        attempt=attempt + 1,
+                        max_retries=config.max_retries,
+                        delay=delay,
+                        error=e,
+                    ),
+                )
             await asyncio.sleep(delay)
             if counter is not None:
                 counter.record_retry(model)

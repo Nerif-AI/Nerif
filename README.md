@@ -11,6 +11,7 @@ Nerif helps you:
 - Control exactly how LLMs work in your code
 - Convert LLM responses into usable data formats
 - Track performance with metrics like cost and success rate
+- Build multi-agent workflows with observable execution traces
 
 Our goal is to make LLMs easier to use for developers, turning complex AI capabilities into practical programming tools.
 
@@ -39,8 +40,10 @@ pip install nerif
 Optional feature groups:
 
 ```bash
-pip install "nerif[rag]"      # NumPy vector store for RAG
+pip install "nerif[rag]"       # NumPy vector store for RAG
 pip install "nerif[img-gen]"   # Image generation (Pillow)
+pip install "nerif[viz]"       # HTML trace reports (Jinja2)
+pip install "nerif[otel]"      # OpenTelemetry adapter
 ```
 
 For local development setup, see `docs/setup_guide.md`.
@@ -64,6 +67,13 @@ else:
 ```
 
 ## Changelog
+
+### v1.4.0
+
+- Opt-in `nerif.observability` package for workflow tracing, trace storage, recording, budget controls, dashboards, exports, and reports
+- Agent and orchestrator tracing integration for multi-agent workflows
+- Callback coverage for LLM, tool, fallback, retry, and memory events
+- Public observability exports and optional `viz` / `otel` extras
 
 ### v1.3.0
 

@@ -54,7 +54,7 @@ To tackle these challenges, we introduce **Nerif**. This tool seamlessly integra
 - **Pydantic output** — `response_model=MyModel` returns validated Pydantic objects directly
 - **Optional embedding** — `nerif()` works without embedding model via text fallback
 - **Conversation memory** — Sliding window and token-based context management with auto-summarization and persistence
-- **Enhanced observability** — Latency tracking, cost calculation, success/failure rates, and callback hooks
+- **Enhanced observability** — Request metrics plus opt-in tracing, trace storage, recording, budget controls, and exports via `nerif.observability`
 - **Lightweight RAG** — Abstract vector store interface with built-in NumPy implementation
 - **Custom exceptions** — Structured error hierarchy (`NerifError`, `ProviderError`, `FormatError`, `ConfigError`)
 - **CLI tools** — `nerif check`, `nerif test-model`, `nerif models` commands

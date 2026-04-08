@@ -1891,6 +1891,7 @@ def get_model_response(
     tool_choice: Optional[Any] = None,
     response_format: Optional[Any] = None,
     retry_config: Optional[RetryConfig] = None,
+    callbacks: Optional[Any] = None,
 ) -> Any:
     """
     Unified model response function. Routes to the correct backend based on model name prefix.
@@ -1962,7 +1963,13 @@ def get_model_response(
 
     _start = time.monotonic()
     try:
-        responses = retry_sync(_call, retry_config=retry_config or DEFAULT_RETRY, counter=counter, model=model)
+        responses = retry_sync(
+            _call,
+            retry_config=retry_config or DEFAULT_RETRY,
+            counter=counter,
+            model=model,
+            callbacks=callbacks,
+        )
     except httpx.HTTPStatusError as exc:
         _latency = (time.monotonic() - _start) * 1000.0
         if counter is not None:
@@ -2000,6 +2007,7 @@ async def get_model_response_async(
     tool_choice: Optional[Any] = None,
     response_format: Optional[Any] = None,
     retry_config: Optional[RetryConfig] = None,
+    callbacks: Optional[Any] = None,
 ) -> Any:
     """Async version of get_model_response."""
     effective_base, effective_key, effective_model, provider = _resolve_endpoint(model, api_key, base_url)
@@ -2049,7 +2057,13 @@ async def get_model_response_async(
 
     _start = time.monotonic()
     try:
-        responses = await retry_async(_call, retry_config=retry_config or DEFAULT_RETRY, counter=counter, model=model)
+        responses = await retry_async(
+            _call,
+            retry_config=retry_config or DEFAULT_RETRY,
+            counter=counter,
+            model=model,
+            callbacks=callbacks,
+        )
     except httpx.HTTPStatusError as exc:
         _latency = (time.monotonic() - _start) * 1000.0
         if counter is not None:

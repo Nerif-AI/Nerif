@@ -186,6 +186,7 @@ class NerifTokenCounter:
         self.on_request_start: Optional[Callable[[RequestStartEvent], None]] = None
         self.on_request_end: Optional[Callable[[RequestEndEvent], None]] = None
         self.on_error: Optional[Callable[[RequestErrorEvent], None]] = None
+        self.callbacks = None
 
     def set_parser(self, parser: ResponseParserBase):
         self.response_parser = parser
