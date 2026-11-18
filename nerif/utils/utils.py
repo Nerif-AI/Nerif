@@ -6,6 +6,7 @@ from typing import Any, List, Optional, Union
 import litellm
 import numpy as np
 from openai import OpenAI
+import asyncio
 
 from .token_counter import NerifTokenCounter
 
@@ -26,7 +27,7 @@ OR_SITE_URL = os.environ.get("OR_SITE_URL")
 OR_APP_NAME = os.environ.get("OR_APP_NAME")
 
 # Ollama configuration
-OLLAMA_URL = os.environ.get("OLLAMA_URL")
+OLLAMA_API_BASE = os.environ.get("OLLAMA_API_BASE", "http://localhost:11434")
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY")
 
 # vLLM configuration
@@ -111,18 +112,18 @@ def get_litellm_embedding(
             "input": messages,
         }
     elif model.startswith("ollama"):
-        if base_url is None or base_url == "" or os.environ.get("OLLAMA_URL") is None:
+        if base_url is None or base_url == "":
             # default ollama url
-            base_url = "http://localhost:11434/v1/"
-            
+            base_url = OLLAMA_API_BASE
         kargs = {
             "model": model,
             "input": messages,
             "base_url": base_url,
+            "api_key": "ollama", #dummy api key for ollama
         }
 
 
-    response = litellm.embedding(**kargs)
+    response = asyncio.run(litellm.aembedding(**kargs))
 
     if counter is not None:
         counter.set_parser_based_on_model(model)
@@ -178,7 +179,8 @@ def get_litellm_response(
     elif model.startswith("ollama"):
         if base_url is None or base_url == "":
             # default ollama url
-            base_url = "http://localhost:11434/v1/"
+            base_url = OLLAMA_API_BASE
+            
         kargs = {
             "model": model,
             "messages": messages,
@@ -222,12 +224,12 @@ def get_litellm_response(
 
 def get_ollama_response(
     messages: List[Any],
-    url: str = OLLAMA_URL,
+    url: str = OLLAMA_API_BASE,
     model: str = "llama3.1",
     max_tokens: int | None = None,
     temperature: float = 0,
     stream: bool = False,
-    api_key: Optional[str] = None,
+    api_key: Optional[str] = "ollama", #dummy ollama key
     counter: Optional[NerifTokenCounter] = None,
 ) -> Union[str, List[str]]:
     """

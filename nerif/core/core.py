@@ -300,10 +300,13 @@ class Nerif:
             if self.verification.verify(direct_result):
                 return direct_result
         except:
-            pass
+            if self.debug:
+                print("Embedding mode, failed to get direct result, fallback to verification fit")
         simple_fit = self.verification.simple_fit(response)
-        if simple_fit is not None:
+        if simple_fit is not None and self.verification.verify(simple_fit):
             return simple_fit
+        if self.debug:
+            print("Embedding mode, failed to get simple fit, fallback to force fit")
         force_fit = self.verification.force_fit(response)
         return force_fit
 
@@ -319,7 +322,7 @@ class Nerif:
             while try_id < max_retry:
                 result = self.logits_mode(text)
                 try_id += 1
-                if result is None:
+                if result is None and self.verification.verify(result):
                     if self.debug:
                         print("logits mode failed, {} try".format(try_id))
                     continue
@@ -386,7 +389,9 @@ class NerifMatchString:
         embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
         temperature=0,
         counter=None,
+        debug=False
     ):
+        self.debug = debug
         self.choices = choices
         self.model = model
         self.prompt = (
@@ -451,10 +456,12 @@ class NerifMatchString:
         user_prompt = self.prompt.rsplit("<question>", 1)
         user_prompt = user_prompt[0] + question + user_prompt[1]
         response = self.agent.chat(user_prompt, max_tokens=max_tokens)
+        if self.debug:
+            print("Embedding mode, response:", response)
         if self.verification.verify(response):
             return response
         simple_fit = self.verification.simple_fit(response)
-        if simple_fit is not None:
+        if simple_fit is not None and self.verification.verify(simple_fit):
             return simple_fit
         force_fit = self.verification.force_fit(response)
         return force_fit
@@ -467,7 +474,7 @@ class NerifMatchString:
             while try_id < max_retry:
                 result = self.logits_mode(text)
                 try_id += 1
-                if result is not None:
+                if result is not None and self.verification.verify(result):
                     return result
 
         result = self.embedding_mode(text)
@@ -482,12 +489,14 @@ class NerifMatchString:
         model=NERIF_DEFAULT_LLM_MODEL,
         embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
         counter=None,
+        debug=False
     ):
         new_instance = cls(
             selections,
             model=model,
             embed_model=embed_model,
             counter=counter,
+            debug=debug
         )
         return new_instance.match(text, max_retry=max_retry)
 
@@ -498,6 +507,7 @@ def nerif_match_string(
     model=NERIF_DEFAULT_LLM_MODEL,
     embed_model=NERIF_DEFAULT_EMBEDDING_MODEL,
     counter=None,
+    debug=False,
 ) -> int:
     return NerifMatchString.instance(
         selections,
@@ -505,6 +515,7 @@ def nerif_match_string(
         model=model,
         embed_model=embed_model,
         counter=counter,
+        debug=debug
     )
 
 
